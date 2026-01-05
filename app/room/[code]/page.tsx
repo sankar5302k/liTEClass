@@ -79,7 +79,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                                 <AudioVisualizer
                                     key={peer.id}
                                     stream={peer.stream}
-                                    isMuted={false}
+                                    isMuted={peer.isMuted}
                                     label={peerName}
                                 />
                             );
@@ -105,6 +105,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                                     </div>
                                     <span>{p.user?.name || 'Unknown'}</span>
                                     {p.isHost && <span className="text-xs bg-blue-900 text-blue-200 px-1 rounded">Host</span>}
+                                    {p.isMuted && <span className="text-xs text-red-400 bg-red-900/30 px-1 rounded border border-red-900">Muted</span>}
                                 </li>
                             ))}
                         </ul>

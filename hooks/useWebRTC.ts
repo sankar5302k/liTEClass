@@ -11,6 +11,7 @@ export interface Peer {
     id: string;
     stream?: MediaStream;
     pc: RTCPeerConnection;
+    isMuted?: boolean;
 }
 
 export const useWebRTC = (roomId: string) => {
@@ -58,9 +59,22 @@ export const useWebRTC = (roomId: string) => {
         socketRef.current.on('participants-update', (updatedParticipants: any[]) => {
             console.log('Participants updated:', updatedParticipants);
             setParticipants(updatedParticipants);
+
+            // Sync peers muted state from participants list
+            setPeers(prev => prev.map(p => {
+                const participant = updatedParticipants.find(up => up.socketId === p.id);
+                if (participant) return { ...p, isMuted: participant.isMuted };
+                return p;
+            }));
+
             const myId = socketRef.current?.id;
             const me = updatedParticipants.find(p => p.socketId === myId);
             if (me) currentUserRef.current = me.user;
+        });
+
+        socketRef.current.on('user-toggled-mute', ({ socketId, isMuted }: { socketId: string, isMuted: boolean }) => {
+            setPeers(prev => prev.map(p => p.id === socketId ? { ...p, isMuted } : p));
+            setParticipants(prev => prev.map(p => p.socketId === socketId ? { ...p, isMuted } : p));
         });
 
         socketRef.current.on('user-connected', ({ userId, user }: { userId: string, user: any }) => {
@@ -272,7 +286,9 @@ export const useWebRTC = (roomId: string) => {
         if (myStream) {
             const track = myStream.getAudioTracks()[0];
             track.enabled = !track.enabled;
-            setIsMuted(!track.enabled);
+            const newMutedState = !track.enabled;
+            setIsMuted(newMutedState);
+            socketRef.current?.emit('toggle-mute', { roomId, isMuted: newMutedState });
         }
     };
 

@@ -149,7 +149,8 @@ app.prepare().then(() => {
                 const participants = sockets.map(s => ({
                     socketId: s.id,
                     user: s.data.user,
-                    isHost: room.hostId === s.data.user.email
+                    isHost: room.hostId === s.data.user.email,
+                    isMuted: s.data.isMuted || false
                 }));
 
                 io.to(roomId).emit('participants-update', participants);
@@ -170,7 +171,15 @@ app.prepare().then(() => {
         });
 
         socket.on('refresh-materials', ({ roomId }) => {
-            socket.to(roomId).emit('materials-updated');
+            io.to(roomId).emit('materials-updated');
+        });
+
+        socket.on('toggle-mute', ({ roomId, isMuted }) => {
+            socket.data.isMuted = isMuted;
+            socket.to(roomId).emit('user-toggled-mute', {
+                socketId: socket.id,
+                isMuted
+            });
         });
 
         socket.on('disconnecting', async () => {
@@ -186,7 +195,8 @@ app.prepare().then(() => {
                         .map(s => ({
                             socketId: s.id,
                             user: s.data.user,
-                            isHost: false // We can't easily check DB here without query, but name/email is enough
+                            isHost: false, // We can't easily check DB here without query, but name/email is enough
+                            isMuted: s.data.isMuted || false
                         }));
                     io.to(roomId).emit('participants-update', participants);
                 }
