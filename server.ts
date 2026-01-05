@@ -58,7 +58,7 @@ app.prepare().then(() => {
         path: '/socket.io',
         addTrailingSlash: false,
         cors: {
-            origin: "http://localhost:3000", // Strictly allow localhost for dev
+            origin: process.env.CLIENT_URL || "http://localhost:3000", // Allow Vercel URL/localhost
             methods: ["GET", "POST"],
             credentials: true
         }

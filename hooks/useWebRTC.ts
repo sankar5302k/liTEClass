@@ -4,6 +4,12 @@ import { io, Socket } from 'socket.io-client';
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
+        // IMPORTANT: In production, you MUST add a TURN server here.
+        // {
+        //     urls: 'turn:your-turn-server.com',
+        //     username: 'user',
+        //     credential: 'password'
+        // }
     ],
 };
 
@@ -32,7 +38,10 @@ export const useWebRTC = (roomId: string) => {
             socketRef.current.disconnect();
         }
 
-        socketRef.current = io({
+        const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin;
+
+
+        socketRef.current = io(socketUrl, {
             path: '/socket.io',
             withCredentials: true,
             reconnectionAttempts: 5,
@@ -42,7 +51,7 @@ export const useWebRTC = (roomId: string) => {
         // Attach listeners immediately
         socketRef.current.on('connect', () => {
             console.log("Socket Connected! ID:", socketRef.current?.id);
-            if (peersRef.current['self_stream_ready']) {
+            if (myStreamRef.current) {
                 console.log(`[Client] Emitting join-room ${roomId} (from connect)`);
                 socketRef.current?.emit('join-room', { roomId });
             }
@@ -195,7 +204,6 @@ export const useWebRTC = (roomId: string) => {
             window.location.href = '/';
         });
 
-        // Initial Stream Setup
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert("Microphone access blocked. Browser requires a Secure Context (HTTPS or localhost).");
             console.error("navigator.mediaDevices is undefined.");
@@ -217,7 +225,7 @@ export const useWebRTC = (roomId: string) => {
                 console.log("Mic granted");
                 setMyStream(stream);
                 myStreamRef.current = stream;
-                peersRef.current['self_stream_ready'] = stream as any; // Marker
+                // peersRef.current['self_stream_ready'] = stream as any; // Marker removed
 
                 if (socketRef.current?.connected) {
                     console.log(`[Client] Emitting join-room ${roomId} (from getUserMedia)`);
@@ -307,14 +315,13 @@ export const useWebRTC = (roomId: string) => {
     };
 
     const endMeeting = () => {
-        // hostId is now checked on server via session
+
         socketRef.current?.emit('end-meeting', { roomId });
     };
 
     return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current };
 };
 
-// Helper function to prefer a specific codec in SDP
 const preferCodec = (sdp: string, codec: string) => {
     const sdpLines = sdp.split('\r\n');
     const mLineIndex = sdpLines.findIndex(line => line.startsWith('m=audio'));
@@ -323,7 +330,6 @@ const preferCodec = (sdp: string, codec: string) => {
     const mLine = sdpLines[mLineIndex];
     const elements = mLine.split(' ');
 
-    // Find payload type for codec
     const getPayloadType = (lines: string[], codecName: string) => {
         const pattern = new RegExp(`a=rtpmap:(\\d+) ${codecName}/`, 'i');
         for (const line of lines) {
@@ -336,7 +342,6 @@ const preferCodec = (sdp: string, codec: string) => {
     const pt = getPayloadType(sdpLines, codec);
     if (!pt) return sdp;
 
-    // Move the payload type to the front of the list in the m= line
     const newMLine = [elements[0], elements[1], elements[2]].concat(
         [pt],
         elements.slice(3).filter(p => p !== pt)

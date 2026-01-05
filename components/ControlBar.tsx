@@ -98,10 +98,10 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex items-center gap-4">
                 {isHost && (
                     <>
-                        <div className="relative">
+                        <div className="relative flex items-center">
                             <input
                                 type="file"
                                 id="file-upload"
@@ -112,7 +112,7 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                             />
                             <label
                                 htmlFor="file-upload"
-                                className={`cursor-pointer px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-sm font-medium ${uploading ? 'opacity-50' : ''}`}
+                                className={`cursor-pointer px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-sm font-medium transition flex items-center justify-center ${uploading ? 'opacity-50' : ''}`}
                             >
                                 {uploading ? 'Uploading...' : 'Share Material'}
                             </label>
@@ -120,14 +120,14 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
 
                         <button
                             onClick={endMeeting}
-                            className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-sm font-medium"
+                            className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-sm font-medium transition flex items-center"
                         >
                             End Meeting
                         </button>
                     </>
                 )}
                 {!isHost && (
-                    <a href="/" className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm font-medium">
+                    <a href="/" className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm font-medium transition">
                         Leave
                     </a>
                 )}
