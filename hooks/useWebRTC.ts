@@ -97,7 +97,6 @@ export const useWebRTC = (roomId: string) => {
             console.log(`[WebRTC] Received signal from ${callerID} type=${signal.type || 'candidate'}`);
 
             const processSignal = async () => {
-                // Ensure we have a stream before processing signals
                 let stream = myStreamRef.current;
                 if (!stream) {
                     console.warn("No local stream for processSignal");
@@ -133,6 +132,9 @@ export const useWebRTC = (roomId: string) => {
                         }
 
                         const answer = await pc.createAnswer();
+                        if (answer.sdp) {
+                            answer.sdp = preferCodec(answer.sdp, 'opus');
+                        }
                         await pc.setLocalDescription(answer);
                         socketRef.current?.emit('signal', {
                             target: callerID,
@@ -200,8 +202,17 @@ export const useWebRTC = (roomId: string) => {
             return;
         }
 
-        console.log("Requesting microphone...");
-        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+        console.log("Requesting microphone with high quality constraints...");
+        navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 48000,
+                channelCount: 2
+            },
+            video: false
+        })
             .then((stream) => {
                 console.log("Mic granted");
                 setMyStream(stream);
@@ -270,6 +281,9 @@ export const useWebRTC = (roomId: string) => {
 
         if (initiator) {
             pc.createOffer().then(offer => {
+                if (offer.sdp) {
+                    offer.sdp = preferCodec(offer.sdp, 'opus');
+                }
                 pc.setLocalDescription(offer);
                 socketRef.current?.emit('signal', {
                     target: targetId,
@@ -298,4 +312,36 @@ export const useWebRTC = (roomId: string) => {
     };
 
     return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current };
+};
+
+// Helper function to prefer a specific codec in SDP
+const preferCodec = (sdp: string, codec: string) => {
+    const sdpLines = sdp.split('\r\n');
+    const mLineIndex = sdpLines.findIndex(line => line.startsWith('m=audio'));
+    if (mLineIndex === -1) return sdp;
+
+    const mLine = sdpLines[mLineIndex];
+    const elements = mLine.split(' ');
+
+    // Find payload type for codec
+    const getPayloadType = (lines: string[], codecName: string) => {
+        const pattern = new RegExp(`a=rtpmap:(\\d+) ${codecName}/`, 'i');
+        for (const line of lines) {
+            const match = line.match(pattern);
+            if (match && match[1]) return match[1];
+        }
+        return null;
+    };
+
+    const pt = getPayloadType(sdpLines, codec);
+    if (!pt) return sdp;
+
+    // Move the payload type to the front of the list in the m= line
+    const newMLine = [elements[0], elements[1], elements[2]].concat(
+        [pt],
+        elements.slice(3).filter(p => p !== pt)
+    ).join(' ');
+
+    sdpLines[mLineIndex] = newMLine;
+    return sdpLines.join('\r\n');
 };
