@@ -1,3 +1,4 @@
+import 'dotenv/config'; // Load env vars before anything else
 import { createServer as createHttpServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
 import { parse } from 'url';
@@ -8,6 +9,7 @@ import Room from './models/Room.ts';
 import Material from './models/Material.ts';
 import fs from 'fs';
 import path from 'path';
+import { verifyToken } from './lib/auth.ts';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = '0.0.0.0';
@@ -56,44 +58,103 @@ app.prepare().then(() => {
         path: '/socket.io',
         addTrailingSlash: false,
         cors: {
-            origin: "*",
-            methods: ["GET", "POST"]
+            origin: "http://localhost:3000", // Strictly allow localhost for dev
+            methods: ["GET", "POST"],
+            credentials: true
+        }
+    });
+
+    // Middleware for Auth
+    io.use((socket, next) => {
+        try {
+            const cookieHeader = socket.request.headers.cookie;
+            console.log("Socket Auth: Cookie Header present?", !!cookieHeader);
+
+            if (!cookieHeader) {
+                console.error("Socket Auth: No cookie header");
+                return next(new Error("Authentication error: No cookie"));
+            }
+
+            const getCookie = (name: string) => {
+                const value = `; ${cookieHeader}`;
+                const parts = value.split(`; ${name}=`);
+                if (parts.length === 2) return parts.pop()?.split(';').shift();
+            }
+
+            const token = getCookie('token');
+            // verifyToken is already imported at the top
+
+            if (token) {
+                const payload = verifyToken(token);
+                if (payload) {
+                    console.log("Socket Auth: User verified", (payload as any).email);
+                    socket.data.user = payload;
+                    return next();
+                } else {
+                    console.error("Socket Auth: Invalid token verification. Token:", token.substring(0, 10) + "...");
+                }
+            } else {
+                console.error("Socket Auth: Token not found in cookie");
+            }
+            next(new Error("Authentication error: Invalid session"));
+        } catch (e) {
+            console.error("Socket Auth: Exception", e);
+            next(new Error("Authentication error"));
         }
     });
 
     io.on('connection', (socket: Socket) => {
-        // console.log('Client connected:', socket.id);
+        const user = socket.data.user;
+        // console.log('Client connected:', user?.email);
 
-        socket.on('join-room', async ({ roomId, hostId }) => {
+        socket.on('join-room', async ({ roomId }) => {
+            console.log(`[Server] join-room received from ${socket.id} for room ${roomId}`);
+            const user = socket.data.user;
+
+            if (!user) {
+                console.error(`[Server] User not authenticated for socket ${socket.id}`);
+                socket.emit('error', 'Authentication required to join room');
+                return;
+            }
             try {
+                // console.log("debug: calling dbConnect");
                 await dbConnect();
+                // console.log("debug: db connected, finding room");
                 const room = await Room.findOne({ code: roomId });
 
                 if (!room || !room.active) {
+                    console.error(`[Server] Room ${roomId} not found or inactive`);
                     socket.emit('error', 'Room not found or inactive');
                     return;
                 }
 
-                const isHost = room.hostId === hostId;
-
                 socket.join(roomId);
-                // Identify if host joined? 
-                // We might want to know if the host is online, but for P2P audio, 
-                // everyone connects to everyone.
+                console.log(`[Server] Socket ${socket.id} joined room ${roomId}`);
+
+                // Add to participants in DB
+                await Room.updateOne(
+                    { code: roomId },
+                    { $addToSet: { participants: user.email } }
+                );
+                console.log(`[Server] DB updated for room ${roomId}`);
+
+                const isHost = room.hostId === user.email;
 
                 // Notify others
-                // "user-connected" payload: socketId, isHost status (optional)
-                socket.to(roomId).emit('user-connected', { userId: socket.id, isHost });
+                console.log(`[Join] notifying room ${roomId} about ${user.email} (${socket.id})`);
+                socket.to(roomId).emit('user-connected', { userId: socket.id, user, isHost });
 
-                // Also send existing users to the new joiner?
-                // In mesh, usually new joiner initiates or existing initiate.
-                // Simple mesh: Existing users call the new user.
-                // So notifying existing users "user-connected" is enough if they initiate.
-                // OR: new user calls all existing users.
-                // Let's stick to: Socket.io broadcast (except sender) "user-connected".
-                // Receivers initiate call.
+                // Emit active participants
+                const sockets = await io.in(roomId).fetchSockets();
+                const participants = sockets.map(s => ({
+                    socketId: s.id,
+                    user: s.data.user,
+                    isHost: room.hostId === s.data.user.email
+                }));
 
-                console.log(`User ${socket.id} joined room ${roomId} (Host: ${isHost})`);
+                io.to(roomId).emit('participants-update', participants);
+
+                console.log(`User ${user.email} joined room ${roomId}`);
             } catch (e) {
                 console.error("Join error", e);
             }
@@ -101,7 +162,7 @@ app.prepare().then(() => {
 
         // Signaling for WebRTC
         socket.on('signal', (data) => {
-            // payload: { signal, target, callerId }
+            console.log(`[Signal] ${socket.id} -> ${data.target} type=${data.signal.type}`);
             io.to(data.target).emit('signal', {
                 signal: data.signal,
                 callerID: data.callerID
@@ -112,22 +173,33 @@ app.prepare().then(() => {
             socket.to(roomId).emit('materials-updated');
         });
 
-        socket.on('disconnecting', () => {
+        socket.on('disconnecting', async () => {
             const rooms = socket.rooms;
-            rooms.forEach((roomId) => {
+            rooms.forEach(async (roomId) => {
                 if (roomId !== socket.id) {
                     socket.to(roomId).emit('user-disconnected', socket.id);
+
+                    // Update participants list for others
+                    const sockets = await io.in(roomId).fetchSockets();
+                    const participants = sockets
+                        .filter(s => s.id !== socket.id) // Filter out self
+                        .map(s => ({
+                            socketId: s.id,
+                            user: s.data.user,
+                            isHost: false // We can't easily check DB here without query, but name/email is enough
+                        }));
+                    io.to(roomId).emit('participants-update', participants);
                 }
             });
         });
 
-        socket.on('end-meeting', async ({ roomId, hostId }) => {
+        socket.on('end-meeting', async ({ roomId }) => {
             try {
                 await dbConnect();
                 const room = await Room.findOne({ code: roomId });
                 if (!room) return;
 
-                if (room.hostId === hostId) {
+                if (room.hostId === user.email) {
                     // Delete room and materials
                     await Room.deleteOne({ code: roomId });
                     await Material.deleteMany({ roomId });

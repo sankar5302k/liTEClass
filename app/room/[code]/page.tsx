@@ -8,14 +8,18 @@ import AudioVisualizer from '@/components/AudioVisualizer';
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
     const resolvedParams = use(params);
     const { code } = resolvedParams;
-    const { peers, myStream, toggleMute, isMuted, endMeeting, socket } = useWebRTC(code);
+    const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket } = useWebRTC(code);
     const [isHost, setIsHost] = useState(false);
     const [monitorSelf, setMonitorSelf] = useState(false);
 
     useEffect(() => {
-        const storedHostId = localStorage.getItem('hostId');
-        setIsHost(!!storedHostId);
-    }, []);
+        if (socket && participants.length > 0) {
+            const me = participants.find(p => p.socketId === socket.id);
+            if (me) {
+                setIsHost(me.isHost);
+            }
+        }
+    }, [participants, socket]);
 
     const handleMaterialUploaded = () => {
         socket?.emit('refresh-materials', { roomId: code });
@@ -52,33 +56,59 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     </div>
                 </div>
 
-                {/* Audio Grid */}
-                <div className="flex-1 p-4 pt-16 overflow-y-auto flex flex-wrap content-start items-start justify-center gap-4">
-                    {/* Self */}
-                    <AudioVisualizer
-                        stream={myStream || undefined}
-                        isMuted={isMuted}
-                        label="You"
-                        isSelf={true}
-                        forceEnableAudio={monitorSelf}
-                    />
-
-                    {/* Peers */}
-                    {peers.map((peer) => (
+                {/* Audio Grid and Participants */}
+                <div className="flex-1 p-4 pt-16 overflow-y-auto flex gap-4">
+                    <div className="flex-1 flex flex-wrap content-start items-start justify-center gap-4">
+                        {/* Self */}
                         <AudioVisualizer
-                            key={peer.id}
-                            stream={peer.stream}
-                            isMuted={false}
-                            label={`Peer ${peer.id.slice(0, 4)}`}
+                            stream={myStream || undefined}
+                            isMuted={isMuted}
+                            label="You"
+                            isSelf={true}
+                            forceEnableAudio={monitorSelf}
                         />
-                    ))}
 
-                    {peers.length === 0 && (
-                        <div className="w-full text-center mt-20 text-gray-600">
-                            <p>Waiting for others to join...</p>
-                            <p className="text-sm mt-2">Share the code: <span className="font-mono text-gray-400">{code}</span></p>
-                        </div>
-                    )}
+                        {/* Peers */}
+                        {peers.map((peer) => {
+                            // Find user info for this peer
+                            // We don't have direct mapping in 'peer' object yet unless we added it in useWebRTC 'user-connected'
+                            // But we passed 'user' to peers state in useWebRTC.
+                            // @ts-ignore
+                            const peerName = peer.user?.name || `Peer ${peer.id.slice(0, 4)}`;
+                            return (
+                                <AudioVisualizer
+                                    key={peer.id}
+                                    stream={peer.stream}
+                                    isMuted={false}
+                                    label={peerName}
+                                />
+                            );
+                        })}
+
+                        {peers.length === 0 && (
+                            <div className="w-full text-center mt-20 text-gray-600">
+                                <p>Waiting for others to join...</p>
+                                <p className="text-sm mt-2">Share the code: <span className="font-mono text-gray-400">{code}</span></p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Participants Sidebar */}
+                    <div className="w-64 bg-gray-800 rounded-lg p-4 border border-gray-700 hidden md:block">
+                        <h3 className="text-lg font-semibold mb-4 text-gray-200">Participants</h3>
+                        <ul className="space-y-2">
+                            {/* @ts-ignore */}
+                            {participants && participants.map((p) => (
+                                <li key={p.socketId} className="flex items-center gap-2 text-sm text-gray-300">
+                                    <div className="w-8 h-8 rounded-full bg-gray-600 overflow-hidden">
+                                        {p.user?.picture ? <img src={p.user.picture} alt={p.user.name} /> : <div className="w-full h-full flex items-center justify-center text-xs">{p.user?.name?.[0]}</div>}
+                                    </div>
+                                    <span>{p.user?.name || 'Unknown'}</span>
+                                    {p.isHost && <span className="text-xs bg-blue-900 text-blue-200 px-1 rounded">Host</span>}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
                 </div>
 
                 {/* Sidebar */}

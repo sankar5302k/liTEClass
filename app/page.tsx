@@ -1,108 +1,113 @@
 'use client';
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+interface User {
+  name: string;
+  email: string;
+  picture: string;
+}
 
 export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [joining, setJoining] = useState(false);
 
-  const createRoom = async () => {
-    setCreating(true);
+  useEffect(() => {
+    // Ideally fetch /api/auth/me or verify via client cookie if accessible (not httpOnly)
+    // For now we assume if the API call below fails, we redirect.
+    // However, since we used httpOnly cookies, we need an endpoint to check auth status.
+    // Let's create a quick check.
+
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Not authenticated');
+      })
+      .then(data => {
+        setUser(data.user);
+        setLoading(false);
+      })
+      .catch(() => {
+        // router.push('/login'); 
+        // Don't auto-redirect here to avoid loops if needed, but usually yes.
+        router.push('/login');
+      });
+  }, [router]);
+
+  const createMeeting = async () => {
+    setLoading(true);
     try {
-      const res = await fetch('/api/rooms', { method: 'POST' });
+      const res = await fetch('/api/rooms/create', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        // Store hostId
-        localStorage.setItem('hostId', data.hostId);
         router.push(`/room/${data.code}`);
       } else {
-        alert('Failed to create room');
+        console.error("Failed to create room");
+        setLoading(false);
       }
     } catch (e) {
       console.error(e);
-      alert('Error creating room');
-    } finally {
-      setCreating(false);
+      setLoading(false);
     }
   };
 
-  const joinRoom = async (e: React.FormEvent) => {
+  const joinMeeting = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinCode) return;
-    setJoining(true);
-    try {
-      const res = await fetch(`/api/rooms/${joinCode}`);
-      if (res.ok) {
-        // Clear hostId if any, as we are joining as student
-        localStorage.removeItem('hostId');
-        router.push(`/room/${joinCode}`);
-      } else {
-        alert('Room not found or inactive');
-      }
-    } catch (e) {
-      alert('Error joining room');
-    } finally {
-      setJoining(false);
+    if (joinCode.trim()) {
+      router.push(`/room/${joinCode.trim()}`);
     }
   };
+
+  if (loading) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Loading...</div>;
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white p-4">
-      <div className="w-full max-w-md p-8 bg-gray-900 rounded-lg shadow-xl border border-gray-800">
-        <h1 className="text-3xl font-bold mb-8 text-center bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-          LiteClass
-        </h1>
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <header className="flex justify-between items-center mb-12">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">LiteClass</h1>
+        <div className="flex items-center gap-4">
+          <img src={user?.picture} alt={user?.name} className="w-10 h-10 rounded-full border-2 border-primary" />
+          <span className="hidden md:block">{user?.name}</span>
+        </div>
+      </header>
 
-        <div className="space-y-6">
-          <div>
-            <button
-              onClick={createRoom}
-              disabled={creating}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition disabled:opacity-50"
-            >
-              {creating ? 'Creating...' : 'Create New Room'}
-            </button>
-            <p className="text-center text-sm text-gray-500 mt-2">Start a session as Host</p>
+      <main className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8">
+        {/* Create Meeting */}
+        <div className="bg-gray-800 p-8 rounded-2xl shadow-xl hover:bg-gray-750 transition duration-300 cursor-pointer border border-gray-700 hover:border-blue-500" onClick={createMeeting}>
+          <div className="w-14 h-14 bg-blue-600 rounded-xl flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
           </div>
+          <h2 className="text-2xl font-semibold mb-2">New Meeting</h2>
+          <p className="text-gray-400">Create a new meeting and invite others to join.</p>
+        </div>
 
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-gray-700"></div>
-            <span className="flex-shrink mx-4 text-gray-400">OR</span>
-            <div className="flex-grow border-t border-gray-700"></div>
+        {/* Join Meeting */}
+        <div className="bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-700">
+          <div className="w-14 h-14 bg-purple-600 rounded-xl flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
           </div>
-
-          <form onSubmit={joinRoom} className="space-y-4">
-            <div>
-              <label htmlFor="code" className="block text-sm font-medium text-gray-400 mb-1">
-                Room Code
-              </label>
-              <input
-                type="text"
-                id="code"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="Ex: A1B2C3"
-                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-white placeholder-gray-600 text-center tracking-widest uppercase font-mono"
-                maxLength={6}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={joining || !joinCode}
-              className="w-full py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold transition disabled:opacity-50"
-            >
-              {joining ? 'Joining...' : 'Join Room'}
+          <h2 className="text-2xl font-semibold mb-4">Join Meeting</h2>
+          <form onSubmit={joinMeeting} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Enter room code"
+              className="flex-1 bg-gray-700 border-none rounded-lg focus:ring-2 focus:ring-purple-500 px-4 py-2"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+            />
+            <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition">
+              Join
             </button>
           </form>
         </div>
-      </div>
-
-      <div className="mt-8 text-center text-xs text-gray-600 max-w-sm">
-        <p>Low-bandwidth audio-only environment.</p>
-        <p>No video. No persistent data.</p>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
