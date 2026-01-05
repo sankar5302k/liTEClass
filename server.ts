@@ -182,6 +182,11 @@ app.prepare().then(() => {
             });
         });
 
+        socket.on('send-message', (data) => {
+            // Broadcast to everyone else (sender updates optimistically)
+            socket.to(data.roomId).emit('receive-message', data);
+        });
+
         socket.on('disconnecting', async () => {
             const rooms = socket.rooms;
             rooms.forEach(async (roomId) => {

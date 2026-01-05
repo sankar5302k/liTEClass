@@ -40,7 +40,7 @@ export default function MaterialViewer({ roomId, socket }: MaterialViewerProps) 
     }, [roomId, socket]);
 
     return (
-        <div className="w-full md:w-1/3 bg-gray-900 border-l border-gray-800 p-4 overflow-y-auto h-full">
+        <div className="w-full h-full bg-gray-900 p-4 overflow-y-auto">
             <h3 className="text-xl font-semibold mb-4 text-white">Classroom Materials</h3>
             {materials.length === 0 ? (
                 <p className="text-gray-500 italic">No materials uploaded yet.</p>

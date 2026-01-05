@@ -4,6 +4,8 @@ import { useWebRTC } from '@/hooks/useWebRTC';
 import ControlBar from '@/components/ControlBar';
 import MaterialViewer from '@/components/MaterialViewer';
 import AudioVisualizer from '@/components/AudioVisualizer';
+import ChatRoom from '@/components/ChatRoom';
+import { useRef } from 'react';
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
     const resolvedParams = use(params);
@@ -11,12 +13,15 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket } = useWebRTC(code);
     const [isHost, setIsHost] = useState(false);
     const [monitorSelf, setMonitorSelf] = useState(false);
+    const [userName, setUserName] = useState<string>('Me');
+    const [mobileTab, setMobileTab] = useState<'chat' | 'participants' | null>(null);
 
     useEffect(() => {
         if (socket && participants.length > 0) {
             const me = participants.find(p => p.socketId === socket.id);
             if (me) {
                 setIsHost(me.isHost);
+                setUserName(me.user?.name || 'Me');
             }
         }
     }, [participants, socket]);
@@ -39,7 +44,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             </header>
 
             {/* Main Content */}
-            <div className="flex flex-1 overflow-hidden relative">
+            <div className="flex flex-col md:flex-row flex-1 overflow-hidden relative">
                 {/* Mic Test Controls */}
                 <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
                     <div className="flex items-center gap-2 bg-gray-800 p-2 rounded opacity-80 hover:opacity-100 transition border border-gray-700">
@@ -93,9 +98,20 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         )}
                     </div>
 
-                    {/* Participants Sidebar */}
-                    <div className="w-64 bg-gray-800 rounded-lg p-4 border border-gray-700 hidden md:block">
-                        <h3 className="text-lg font-semibold mb-4 text-gray-200">Participants</h3>
+                    {/* Participants Sidebar - Responsive Overlay */}
+                    <div className={`${mobileTab === 'participants' ? 'fixed inset-0 z-50 bg-gray-900 p-4' : 'hidden md:block w-64 bg-gray-800 rounded-lg p-4 border border-gray-700 h-fit'}`}>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-gray-200">Participants</h3>
+                            {/* Close button for mobile */}
+                            <button
+                                onClick={() => setMobileTab(null)}
+                                className="md:hidden text-gray-400 hover:text-white"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                         <ul className="space-y-2">
                             {/* @ts-ignore */}
                             {participants && participants.map((p) => (
@@ -112,8 +128,29 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     </div>
                 </div>
 
-                {/* Sidebar */}
-                <MaterialViewer roomId={code} socket={socket} />
+
+                {/* Sidebar (Materials + Chat) - Responsive Overlay */}
+                <div className={`${mobileTab === 'chat' ? 'fixed inset-0 z-50 bg-gray-900 flex flex-col' : 'hidden md:flex w-full md:w-1/3 flex-col bg-gray-900 border-l border-gray-800 h-full'}`}>
+                    {/* Mobile Header with Close Button */}
+                    <div className="md:hidden flex justify-between items-center p-4 border-b border-gray-800 bg-gray-850">
+                        <h3 className="text-lg font-semibold text-white">Materials & Chat</h3>
+                        <button
+                            onClick={() => setMobileTab(null)}
+                            className="text-gray-400 hover:text-white"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div className="flex-1 overflow-hidden h-1/2">
+                        <MaterialViewer roomId={code} socket={socket} />
+                    </div>
+                    <div className="flex-1 overflow-hidden h-1/2 border-t border-gray-800">
+                        <ChatRoom roomId={code} socket={socket} userName={userName} />
+                    </div>
+                </div>
             </div>
 
             {/* Control Bar */}
@@ -125,6 +162,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 endMeeting={endMeeting}
                 roomId={code}
                 onMaterialUploaded={handleMaterialUploaded}
+                onToggleChat={() => setMobileTab(prev => prev === 'chat' ? null : 'chat')}
+                onToggleParticipants={() => setMobileTab(prev => prev === 'participants' ? null : 'participants')}
             />
         </div>
     );
