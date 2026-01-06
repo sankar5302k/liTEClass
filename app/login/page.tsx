@@ -27,14 +27,14 @@ export default function LoginPage() {
         }
     };
 
+
+
     useEffect(() => {
-        // @ts-ignore
-        window.handleCredentialResponse = handleCredentialResponse;
+        (window as any).handleCredentialResponse = handleCredentialResponse;
     }, []);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#0F172A] relative overflow-hidden">
-            {/* Background Gradients */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
                 <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-blue-600/30 rounded-full blur-3xl animate-pulse"></div>
                 <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-purple-600/30 rounded-full blur-3xl animate-pulse delay-700"></div>
@@ -60,6 +60,7 @@ export default function LoginPage() {
                         <div className="flex justify-center mt-6 pt-4 border-t border-gray-700/50">
                             <div id="buttonDiv" className="w-full flex justify-center"></div>
                         </div>
+
                     </div>
 
                     <div className="text-center text-xs text-gray-500 mt-8">
@@ -68,16 +69,15 @@ export default function LoginPage() {
                 </div>
             </div>
 
+
             <Script
                 src="https://accounts.google.com/gsi/client"
                 onLoad={() => {
-                    // @ts-ignore
-                    google.accounts.id.initialize({
+                    ((window as any).google.accounts.id as any).initialize({
                         client_id: "625686226267-t1su5hijmkv1ilb435fgpl1hrsnsb6fk.apps.googleusercontent.com",
                         callback: handleCredentialResponse
                     });
-                    // @ts-ignore
-                    google.accounts.id.renderButton(
+                    ((window as any).google.accounts.id as any).renderButton(
                         document.getElementById("buttonDiv"),
                         {
                             theme: "filled_black",
@@ -89,6 +89,7 @@ export default function LoginPage() {
                     );
                 }}
             />
+
         </div>
     );
 }

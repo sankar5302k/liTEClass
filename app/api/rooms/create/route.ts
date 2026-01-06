@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     try {
         await dbConnect();
 
-        // Verify Authentication
+
         const cookieStore = await cookies();
         const token = cookieStore.get('token')?.value;
 
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
         }
 
-        // Generate unique code
+
         let code = Math.random().toString(36).substring(2, 7);
         let exists = await Room.findOne({ code });
         while (exists) {

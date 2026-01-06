@@ -10,9 +10,10 @@ interface ControlBarProps {
     onToggleChat: () => void;
     onToggleParticipants: () => void;
     onSendReaction: (emoji: string) => void;
+    onToggleWhiteboard: () => void;
 }
 
-export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, roomId, onMaterialUploaded, onToggleChat, onToggleParticipants, onSendReaction }: ControlBarProps) {
+export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, roomId, onMaterialUploaded, onToggleChat, onToggleParticipants, onSendReaction, onToggleWhiteboard }: ControlBarProps) {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -49,7 +50,7 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-2 md:p-4 flex justify-between items-center text-white z-50">
-            {/* Reactions Popover */}
+
             {showReactions && (
                 <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 rounded-full px-4 py-2 flex gap-2 shadow-xl animate-scale-up origin-bottom">
                     {reactions.map(emoji => (
@@ -100,8 +101,19 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
-            {/* Center Controls */}
+
             <div className="hidden md:flex gap-4 absolute left-1/2 transform -translate-x-1/2">
+                <button
+                    onClick={onToggleWhiteboard}
+                    className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
+                    title="Whiteboard"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" />
+                    </svg>
+                </button>
+
                 <button
                     onClick={() => setShowReactions(!showReactions)}
                     className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white relative"
@@ -113,8 +125,17 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
-            {/* Mobile Toggles */}
+
             <div className="flex gap-2 md:gap-4 md:hidden">
+                <button
+                    onClick={onToggleWhiteboard}
+                    className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.362 5.214A8.252 8.252 0 0 1 12 21 8.25 8.25 0 0 1 6.038 7.047 8.287 8.287 0 0 0 9 9.601a8.983 8.983 0 0 1 3.361-6.867 8.21 8.21 0 0 0 3 2.48Z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.468 5.99 5.99 0 0 0-1.925 3.547 5.975 5.975 0 0 1-2.133-1.001A3.75 3.75 0 0 0 12 18Z" />
+                    </svg>
+                </button>
                 <button
                     onClick={() => setShowReactions(!showReactions)}
                     className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white"

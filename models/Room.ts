@@ -10,9 +10,9 @@ export interface IRoom extends Document {
 
 const RoomSchema: Schema = new Schema({
     code: { type: String, required: true, unique: true },
-    hostId: { type: String, required: true }, // This will be the host's email
+    hostId: { type: String, required: true },
     active: { type: Boolean, default: true },
-    participants: { type: [String], default: [] }, // Array of emails
+    participants: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now, expires: '24h' },
 });
 

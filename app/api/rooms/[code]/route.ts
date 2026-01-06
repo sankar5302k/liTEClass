@@ -3,7 +3,7 @@ import dbConnect from '@/lib/db';
 import Room from '@/models/Room';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
-    // In Next.js 15, params is a Promise. Need to await it.
+
     const { code } = await params;
     try {
         await dbConnect();

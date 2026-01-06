@@ -1,4 +1,4 @@
-import 'dotenv/config'; // Load env vars before anything else
+import 'dotenv/config';
 import { createServer as createHttpServer } from 'http';
 import { createServer as createHttpsServer } from 'https';
 import { parse } from 'url';
@@ -7,6 +7,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import dbConnect from './lib/db.ts';
 import Room from './models/Room.ts';
 import Material from './models/Material.ts';
+import WhiteboardLog from './models/WhiteboardLog.ts';
 import fs from 'fs';
 import path from 'path';
 import { verifyToken } from './lib/auth.ts';
@@ -19,7 +20,7 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-    let server: any; // Type 'any' to accommodate both http and https server variants
+    let server: ReturnType<typeof createHttpServer> | ReturnType<typeof createHttpsServer>;
     const certPath = path.join(process.cwd(), 'cert.pem');
     const keyPath = path.join(process.cwd(), 'key.pem');
     const useHttps = fs.existsSync(certPath) && fs.existsSync(keyPath);
@@ -64,7 +65,7 @@ app.prepare().then(() => {
         }
     });
 
-    // Middleware for Auth
+
     io.use((socket, next) => {
         try {
             const cookieHeader = socket.request.headers.cookie;
@@ -82,7 +83,7 @@ app.prepare().then(() => {
             }
 
             const token = getCookie('token');
-            // verifyToken is already imported at the top
+
 
             if (token) {
                 const payload = verifyToken(token);
@@ -105,7 +106,7 @@ app.prepare().then(() => {
 
     io.on('connection', (socket: Socket) => {
         const user = socket.data.user;
-        // console.log('Client connected:', user?.email);
+
 
         socket.on('join-room', async ({ roomId }) => {
             console.log(`[Server] join-room received from ${socket.id} for room ${roomId}`);
@@ -117,9 +118,7 @@ app.prepare().then(() => {
                 return;
             }
             try {
-                // console.log("debug: calling dbConnect");
                 await dbConnect();
-                // console.log("debug: db connected, finding room");
                 const room = await Room.findOne({ code: roomId });
 
                 if (!room || !room.active) {
@@ -131,7 +130,7 @@ app.prepare().then(() => {
                 socket.join(roomId);
                 console.log(`[Server] Socket ${socket.id} joined room ${roomId}`);
 
-                // Add to participants in DB
+
                 await Room.updateOne(
                     { code: roomId },
                     { $addToSet: { participants: user.email } }
@@ -140,11 +139,11 @@ app.prepare().then(() => {
 
                 const isHost = room.hostId === user.email;
 
-                // Notify others
+
                 console.log(`[Join] notifying room ${roomId} about ${user.email} (${socket.id})`);
                 socket.to(roomId).emit('user-connected', { userId: socket.id, user, isHost });
 
-                // Emit active participants
+
                 const sockets = await io.in(roomId).fetchSockets();
                 const participants = sockets.map(s => ({
                     socketId: s.id,
@@ -161,7 +160,7 @@ app.prepare().then(() => {
             }
         });
 
-        // Signaling for WebRTC
+
         socket.on('signal', (data) => {
             console.log(`[Signal] ${socket.id} -> ${data.target} type=${data.signal.type}`);
             io.to(data.target).emit('signal', {
@@ -192,8 +191,50 @@ app.prepare().then(() => {
         });
 
         socket.on('send-message', (data) => {
-            // Broadcast to everyone else (sender updates optimistically)
+
             socket.to(data.roomId).emit('receive-message', data);
+        });
+
+
+        socket.on('wb-join', async ({ roomId }) => {
+            try {
+                await dbConnect();
+
+                const logs = await WhiteboardLog.find({ roomId }).sort({ timestamp: 1 });
+                socket.emit('wb-history', logs);
+            } catch (e) {
+                console.error("Whiteboard join error", e);
+            }
+        });
+
+        socket.on('wb-event', async (eventData) => {
+            const { roomId } = eventData;
+
+            socket.to(roomId).emit('wb-event', eventData);
+
+
+            try {
+                await dbConnect();
+                await WhiteboardLog.create({
+                    roomId: eventData.roomId,
+                    userId: eventData.userId || socket.data.user?.email,
+                    type: eventData.type,
+                    data: eventData.data
+                });
+            } catch (e) {
+                console.error("Whiteboard save error", e);
+            }
+        });
+
+        socket.on('wb-clear', async ({ roomId }) => {
+
+            try {
+                await dbConnect();
+                await WhiteboardLog.deleteMany({ roomId });
+                io.to(roomId).emit('wb-clear');
+            } catch (e) {
+                console.error("Whiteboard clear error", e);
+            }
         });
 
         socket.on('disconnecting', async () => {
@@ -202,14 +243,14 @@ app.prepare().then(() => {
                 if (roomId !== socket.id) {
                     socket.to(roomId).emit('user-disconnected', socket.id);
 
-                    // Update participants list for others
+
                     const sockets = await io.in(roomId).fetchSockets();
                     const participants = sockets
-                        .filter(s => s.id !== socket.id) // Filter out self
+                        .filter(s => s.id !== socket.id)
                         .map(s => ({
                             socketId: s.id,
                             user: s.data.user,
-                            isHost: false, // We can't easily check DB here without query, but name/email is enough
+                            isHost: false,
                             isMuted: s.data.isMuted || false
                         }));
                     io.to(roomId).emit('participants-update', participants);
@@ -224,9 +265,10 @@ app.prepare().then(() => {
                 if (!room) return;
 
                 if (room.hostId === user.email) {
-                    // Delete room and materials
+
                     await Room.deleteOne({ code: roomId });
                     await Material.deleteMany({ roomId });
+                    await WhiteboardLog.deleteMany({ roomId });
 
                     io.to(roomId).emit('meeting-ended');
                     io.to(roomId).disconnectSockets();

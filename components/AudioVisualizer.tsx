@@ -13,7 +13,6 @@ export default function AudioVisualizer({ stream, isMuted, label, isSelf, forceE
 
     useEffect(() => {
         if (audioRef.current && stream) {
-            // Log for debugging
             console.log(`[AudioVisualizer] Setting stream for ${label}. Tracks:`, stream.getAudioTracks().length);
             stream.getAudioTracks().forEach(t => console.log(`Track ${t.id}: enabled=${t.enabled}, muted=${t.muted}, readyState=${t.readyState}`));
 
@@ -21,7 +20,6 @@ export default function AudioVisualizer({ stream, isMuted, label, isSelf, forceE
                 console.log(`[AudioVisualizer] Attaching stream to audio element for ${label}`);
                 audioRef.current.srcObject = stream;
 
-                // Explicitly call play to handle AutoPlay restrictions
                 audioRef.current.play().catch(e => console.error("Error playing audio:", e));
             } else {
                 audioRef.current.srcObject = null;
@@ -62,8 +60,6 @@ export default function AudioVisualizer({ stream, isMuted, label, isSelf, forceE
                 ref={audioRef}
                 autoPlay
                 playsInline
-                // Don't use muted attribute if monitoring is on.
-                // If isSelf AND !forceEnableAudio, we just don't set srcObject above, so safe.
                 muted={isSelf && !forceEnableAudio}
             />
         </div >
