@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     try {
         await dbConnect();
 
-        // Generate unique 6-char code
+
         let code = '';
         let exists = true;
         while (exists) {

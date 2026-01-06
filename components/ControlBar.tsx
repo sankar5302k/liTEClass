@@ -50,7 +50,7 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-2 md:p-4 flex justify-between items-center text-white z-50">
-            {/* Reactions Popover */}
+
             {showReactions && (
                 <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 rounded-full px-4 py-2 flex gap-2 shadow-xl animate-scale-up origin-bottom">
                     {reactions.map(emoji => (
@@ -101,7 +101,7 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
-            {/* Center Controls */}
+
             <div className="hidden md:flex gap-4 absolute left-1/2 transform -translate-x-1/2">
                 <button
                     onClick={onToggleWhiteboard}
@@ -125,7 +125,7 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
-            {/* Mobile Toggles */}
+
             <div className="flex gap-2 md:gap-4 md:hidden">
                 <button
                     onClick={onToggleWhiteboard}

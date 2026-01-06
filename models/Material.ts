@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IMaterial extends Document {
-    roomId: string; // Storing roomId as string (code) or ref? Code is easier for lookup.
+    roomId: string;
     filename: string;
     contentType: string;
     data: Buffer;

@@ -11,11 +11,11 @@ export default function ReactionOverlay({ lastReaction }: ReactionOverlayProps) 
     useEffect(() => {
         if (lastReaction) {
             const id = Date.now();
-            const left = Math.random() * 80 + 10; // Random horizontal position between 10% and 90%
+            const left = Math.random() * 80 + 10; 
 
             setVisibleReactions(prev => [...prev, { id, emoji: lastReaction.reaction, left }]);
 
-            // Cleanup after animation
+
             setTimeout(() => {
                 setVisibleReactions(prev => prev.filter(r => r.id !== id));
             }, 2000);

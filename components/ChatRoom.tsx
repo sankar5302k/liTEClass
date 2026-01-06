@@ -48,7 +48,7 @@ export default function ChatRoom({ roomId, socket, userName }: ChatRoomProps) {
             id: Date.now().toString(),
         };
 
-        // Optimistic update
+
         setMessages((prev) => [...prev, { ...messageData, isSelf: true }]);
 
         socket.emit('send-message', messageData);
@@ -65,8 +65,8 @@ export default function ChatRoom({ roomId, socket, userName }: ChatRoomProps) {
                 {messages.map((msg) => (
                     <div key={msg.id} className={`flex flex-col ${msg.isSelf ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${msg.isSelf
-                                ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-gray-700 text-gray-200 rounded-bl-none'
+                            ? 'bg-blue-600 text-white rounded-br-none'
+                            : 'bg-gray-700 text-gray-200 rounded-bl-none'
                             }`}>
                             {!msg.isSelf && <p className="text-xs text-blue-300 font-bold mb-1">{msg.sender}</p>}
                             <p>{msg.text}</p>

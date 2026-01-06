@@ -4,12 +4,6 @@ import { io, Socket } from 'socket.io-client';
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        // IMPORTANT: In production, you MUST add a TURN server here.
-        // {
-        //     urls: 'turn:your-turn-server.com',
-        //     username: 'user',
-        //     credential: 'password'
-        // }
     ],
 };
 
@@ -33,7 +27,7 @@ export const useWebRTC = (roomId: string) => {
     const currentUserRef = useRef<any>(null);
 
     useEffect(() => {
-        // Force clean connection on mount
+
         if (socketRef.current) {
             socketRef.current.disconnect();
         }
@@ -48,7 +42,6 @@ export const useWebRTC = (roomId: string) => {
             forceNew: true
         });
 
-        // Attach listeners immediately
         socketRef.current.on('connect', () => {
             console.log("Socket Connected! ID:", socketRef.current?.id);
             if (myStreamRef.current) {
@@ -69,7 +62,7 @@ export const useWebRTC = (roomId: string) => {
             console.log('Participants updated:', updatedParticipants);
             setParticipants(updatedParticipants);
 
-            // Sync peers muted state from participants list
+
             setPeers(prev => prev.map(p => {
                 const participant = updatedParticipants.find(up => up.socketId === p.id);
                 if (participant) return { ...p, isMuted: participant.isMuted };
@@ -88,7 +81,7 @@ export const useWebRTC = (roomId: string) => {
 
         socketRef.current.on('user-connected', ({ userId, user }: { userId: string, user: any }) => {
             console.log('User connected event:', userId, user?.email);
-            // Initiate connection using existing stream
+
             const stream = myStreamRef.current;
             if (stream) {
                 const pc = createPeerConnection(userId, stream, true);
@@ -114,7 +107,6 @@ export const useWebRTC = (roomId: string) => {
 
                 let pc = peersRef.current[callerID];
 
-                // Create PC if it doesn't exist (incoming call)
                 if (!pc) {
                     pc = createPeerConnection(callerID, stream, false);
                     peersRef.current[callerID] = pc;
@@ -132,7 +124,7 @@ export const useWebRTC = (roomId: string) => {
                     try {
                         await pc.setRemoteDescription(new RTCSessionDescription(signal));
 
-                        // Process candidates
+
                         if (candidateQueue.current[callerID]) {
                             for (const candidate of candidateQueue.current[callerID]) {
                                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -160,7 +152,6 @@ export const useWebRTC = (roomId: string) => {
                     }
                     try {
                         await pc.setRemoteDescription(new RTCSessionDescription(signal));
-                        // Process candidates
                         if (candidateQueue.current[callerID]) {
                             for (const candidate of candidateQueue.current[callerID]) {
                                 await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -225,7 +216,6 @@ export const useWebRTC = (roomId: string) => {
                 console.log("Mic granted");
                 setMyStream(stream);
                 myStreamRef.current = stream;
-                // peersRef.current['self_stream_ready'] = stream as any; // Marker removed
 
                 if (socketRef.current?.connected) {
                     console.log(`[Client] Emitting join-room ${roomId} (from getUserMedia)`);
@@ -315,7 +305,6 @@ export const useWebRTC = (roomId: string) => {
     };
 
     const endMeeting = () => {
-        // hostId is now checked on server via session
         socketRef.current?.emit('end-meeting', { roomId });
     };
 
@@ -331,7 +320,6 @@ export const useWebRTC = (roomId: string) => {
 
         socketRef.current.on('reaction-received', (data: { socketId: string, reaction: string, user?: any }) => {
             setLastReaction(data);
-            // Clear after animation duration (optional, or handle in UI)
             setTimeout(() => setLastReaction(null), 3000);
         });
 

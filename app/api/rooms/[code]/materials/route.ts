@@ -30,13 +30,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
         }
 
         await dbConnect();
-        // Check if user is host
+
         const room = await Room.findOne({ code, hostId: userEmail });
         if (!room) {
             return NextResponse.json({ error: 'Unauthorized: You are not the host' }, { status: 403 });
         }
 
-        // Convert file to Buffer
+
         const buffer = Buffer.from(await file.arrayBuffer());
 
         const material = await Material.create({
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
     const { code } = await params;
     try {
         await dbConnect();
-        // Return list of materials (without data)
+
         const materials = await Material.find({ roomId: code }).select('-data');
         return NextResponse.json(materials);
     } catch (error) {

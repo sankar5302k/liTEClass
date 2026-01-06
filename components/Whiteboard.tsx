@@ -81,9 +81,6 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
     const flushEvents = useCallback(() => {
         if (!socket || pendingEvents.current.length === 0) return;
 
-        // In a real optimized system, we might batch these into one packet.
-        // For simplicity, we send them individually but we could refactor to send arrays.
-        // Sending individually for now to match strict schema.
         pendingEvents.current.forEach(evt => {
             socket.emit('wb-event', {
                 roomId,
@@ -101,7 +98,6 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
         lastSendTime.current = Date.now();
     }, [socket, roomId, user]);
 
-    // Loop to flush events
     useEffect(() => {
         const interval = setInterval(() => {
             if (Date.now() - lastSendTime.current >= THROTTLE_MS) {
@@ -112,14 +108,13 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
     }, [flushEvents]);
 
     const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-        e.preventDefault(); // Prevent scrolling on touch
+        e.preventDefault(); 
         if (!canvasRef.current) return;
         isDrawing.current = true;
         const pos = getNormalizedPos(e);
         lastPoint.current = pos;
 
-        // Emit start event (optional for some logics, but good for "lifting pen" detection)
-        // We'll just track moves for simplicity, but let's record the start point locally
+        
     };
 
     const draw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -130,10 +125,8 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
         const currentColor = isErasing ? '#ffffff' : color;
         const currentWidth = isErasing ? 20 : width;
 
-        // Render locally instantly
         drawLine(lastPoint.current, currentPoint, currentColor, currentWidth);
 
-        // Queue event
         pendingEvents.current.push({
             type: 'draw_move',
             x: currentPoint.x,
@@ -143,24 +136,12 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
             userId: user?.email
         });
 
-        // Implicitly, we also need to send the START point for the line segment if we assume
-        // the other side doesn't know where we are. 
-        // Actually, 'draw_move' typically implies "draw from last known position to here".
-        // But for UDP/lossy tolerance, sending (x1,y1) -> (x2,y2) segments is safer.
-        // Let's stick to simple "draw to X,Y" and assume robust enough connection or accept gaps.
-        // Better approach for low bandwidth: Send line segments (start+end).
-        // Let's update pendingEvents schema slightly in logic, but keep simple for now.
-        // To fix gaps on remote: we actually need to send SEGMENTS.
 
-        // Let's change the event data to include start coordinates to be safe against packet ordering?
-        // Actually, just sending the 'to' point is standard for TCP (Socket.io). 
-        // If we want to be super robust, we send {fromX, fromY, toX, toY}.
-        // Let's modify the socket emit to include 'from'.
 
         socket?.emit('wb-event', {
             roomId,
             userId: user?.email,
-            type: 'draw_line', // Switching to explicit line segment
+            type: 'draw_line', 
             data: {
                 fromX: lastPoint.current.x,
                 fromY: lastPoint.current.y,
@@ -171,16 +152,7 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
             }
         });
 
-        // Clear pending because we just emitted directly? 
-        // Wait, I said I would throttle. 
-        // If I throttle `draw_line` segments, it works fine.
-        // Let's ignore the `pendingEvents` array for a moment and just throttle the 'emit' call?
-        // No, we need to batch or drop intermediate points if moving too fast.
 
-        // REVISIT THROTTLING:
-        // Simple approach: don't throttle "segments" (heavy traffic).
-        // Better approach: locally draw smooth, send keypoints.
-        // For this MVP: Send every segment but maybe skip very small movements?
 
         lastPoint.current = currentPoint;
     };
@@ -202,7 +174,6 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
 
         const handleRemoteEvent = (event: { roomId: string; userId?: string; type: string; data: any }) => {
             if (event.roomId !== roomId) return;
-            // Don't draw own events if they come back (simplest is check userId)
             if (event.userId === user?.email) return;
 
             if (event.type === 'draw_line') {
@@ -214,7 +185,6 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
         const handleHistory = (logs: IWhiteboardLog[]) => {
             logs.forEach(log => {
                 if (log.type === 'draw_line') {
-                    // Start of workaround: Cast data to any because Record<string, unknown> is hard to destructure directly without checks
                     const data = log.data as any;
                     const { fromX, fromY, toX, toY, color, width } = data;
                     drawLine({ x: fromX, y: fromY }, { x: toX, y: toY }, color, width);
@@ -247,16 +217,12 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
     useEffect(() => {
         const resize = () => {
             if (canvasRef.current) {
-                // We want to keep the drawing scale correct.
-                // For now, let's just resize the backing buffer to match display
-                // Note: Resizing clears canvas! We need it persistent or redraw.
-                // Simple MVP: Fixed internal resolution or just clear on resize (acceptable limitation).
+            
                 const parent = canvasRef.current.parentElement;
                 if (parent) {
                     canvasRef.current.width = parent.clientWidth;
                     canvasRef.current.height = parent.clientHeight;
                 }
-                // Re-request history to redraw?
                 socket?.emit('wb-join', { roomId });
             }
         };
@@ -267,7 +233,6 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
 
     return (
         <div className="absolute inset-0 bg-white z-50 flex flex-col">
-            {/* Toolbar */}
             <div className="bg-gray-100 border-b p-2 flex gap-4 items-center justify-between">
                 <div className="flex gap-2">
                     <input
@@ -297,7 +262,6 @@ export default function Whiteboard({ roomId, socket, user, onClose }: Whiteboard
                 </div>
             </div>
 
-            {/* Canvas Area */}
             <div className="flex-1 relative cursor-crosshair touch-none">
                 <canvas
                     ref={canvasRef}

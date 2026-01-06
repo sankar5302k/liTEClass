@@ -27,34 +27,14 @@ export default function LoginPage() {
         }
     };
 
-    // const handleSimpleLogin = async (name: string) => {
-    //     try {
-    //         const res = await fetch('/api/auth/login', {
-    //             method: 'POST',
-    //             headers: {
-    //                 'Content-Type': 'application/json',
-    //             },
-    //             body: JSON.stringify({ name }),
-    //         });
-    //
-    //         if (res.ok) {
-    //             router.push('/');
-    //         } else {
-    //             console.error('Login failed');
-    //         }
-    //     } catch (e) {
-    //         console.error('Error:', e);
-    //     }
-    // };
+
 
     useEffect(() => {
-        // @ts-ignore
-        window.handleCredentialResponse = handleCredentialResponse;
+        (window as any).handleCredentialResponse = handleCredentialResponse;
     }, []);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#0F172A] relative overflow-hidden">
-            {/* Background Gradients */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
                 <div className="absolute -top-1/4 -left-1/4 w-1/2 h-1/2 bg-blue-600/30 rounded-full blur-3xl animate-pulse"></div>
                 <div className="absolute -bottom-1/4 -right-1/4 w-1/2 h-1/2 bg-purple-600/30 rounded-full blur-3xl animate-pulse delay-700"></div>
@@ -77,35 +57,10 @@ export default function LoginPage() {
                             <p className="text-gray-400 mt-2 text-sm">Sign in to access your classrooms and meetings.</p>
                         </div>
 
-                        {/* TEMPORARY: Simple Login Form */}
-                        {/* <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement).value;
-                                if (name) handleSimpleLogin(name);
-                            }}
-                            className="space-y-4 mt-6 pt-4 border-t border-gray-700/50"
-                        >
-                            <input
-                                type="text"
-                                name="name"
-                                placeholder="Your Name"
-                                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
-                                required
-                            />
-                            <button
-                                type="submit"
-                                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-lg transition transform hover:scale-[1.02]"
-                            >
-                                Enter Classroom
-                            </button>
-                        </form> */}
-
-                        {/* Google Auth Disabled */}
                         <div className="flex justify-center mt-6 pt-4 border-t border-gray-700/50">
                             <div id="buttonDiv" className="w-full flex justify-center"></div>
                         </div>
-                        {/* */}
+
                     </div>
 
                     <div className="text-center text-xs text-gray-500 mt-8">
@@ -114,17 +69,15 @@ export default function LoginPage() {
                 </div>
             </div>
 
-            {/* */}
+
             <Script
                 src="https://accounts.google.com/gsi/client"
                 onLoad={() => {
-                    // @ts-ignore
-                    google.accounts.id.initialize({
+                    ((window as any).google.accounts.id as any).initialize({
                         client_id: "625686226267-t1su5hijmkv1ilb435fgpl1hrsnsb6fk.apps.googleusercontent.com",
                         callback: handleCredentialResponse
                     });
-                    // @ts-ignore
-                    google.accounts.id.renderButton(
+                    ((window as any).google.accounts.id as any).renderButton(
                         document.getElementById("buttonDiv"),
                         {
                             theme: "filled_black",
@@ -136,7 +89,7 @@ export default function LoginPage() {
                     );
                 }}
             />
-            {/* */}
+
         </div>
     );
 }

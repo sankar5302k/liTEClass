@@ -17,10 +17,7 @@ export default function Home() {
   const [joinCode, setJoinCode] = useState('');
 
   useEffect(() => {
-    // Ideally fetch /api/auth/me or verify via client cookie if accessible (not httpOnly)
-    // For now we assume if the API call below fails, we redirect.
-    // However, since we used httpOnly cookies, we need an endpoint to check auth status.
-    // Let's create a quick check.
+
 
     fetch('/api/auth/me')
       .then(res => {
@@ -32,8 +29,7 @@ export default function Home() {
         setLoading(false);
       })
       .catch(() => {
-        // router.push('/login'); 
-        // Don't auto-redirect here to avoid loops if needed, but usually yes.
+
         router.push('/login');
       });
   }, [router]);
@@ -94,7 +90,7 @@ export default function Home() {
       </header>
 
       <main className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-        {/* Create Meeting */}
+
         <div
           className="group bg-gray-800 p-6 md:p-8 rounded-2xl shadow-xl hover:bg-gray-750 transition duration-300 cursor-pointer border border-gray-700 hover:border-blue-500 transform hover:-translate-y-1"
           onClick={createMeeting}
@@ -108,7 +104,7 @@ export default function Home() {
           <p className="text-gray-400 text-sm md:text-base">Create a new meeting instantly and invite others to join.</p>
         </div>
 
-        {/* Join Meeting */}
+
         <div className="bg-gray-800 p-6 md:p-8 rounded-2xl shadow-xl border border-gray-700">
           <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-purple-700 rounded-xl flex items-center justify-center mb-4 shadow-lg">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
