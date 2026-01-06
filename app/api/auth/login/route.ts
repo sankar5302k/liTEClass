@@ -9,6 +9,7 @@ const client = new OAuth2Client(process.env.AUTH_GOOGLE_ID);
 export async function POST(req: NextRequest) {
     try {
         const { credential } = await req.json();
+        // const { name } = await req.json();
 
         const ticket = await client.verifyIdToken({
             idToken: credential,
@@ -21,6 +22,12 @@ export async function POST(req: NextRequest) {
         }
 
         const { email, name, picture } = payload;
+
+        // --- Temporary No-Auth Logic ---
+        // if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 });
+        // const email = `${name.toLowerCase().replace(/\s+/g, '')}@example.com`; // Fake email
+        // const picture = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+        // -------------------------------
 
         await dbConnect();
 

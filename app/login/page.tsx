@@ -27,6 +27,26 @@ export default function LoginPage() {
         }
     };
 
+    // const handleSimpleLogin = async (name: string) => {
+    //     try {
+    //         const res = await fetch('/api/auth/login', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //             },
+    //             body: JSON.stringify({ name }),
+    //         });
+    //
+    //         if (res.ok) {
+    //             router.push('/');
+    //         } else {
+    //             console.error('Login failed');
+    //         }
+    //     } catch (e) {
+    //         console.error('Error:', e);
+    //     }
+    // };
+
     useEffect(() => {
         // @ts-ignore
         window.handleCredentialResponse = handleCredentialResponse;
@@ -57,9 +77,35 @@ export default function LoginPage() {
                             <p className="text-gray-400 mt-2 text-sm">Sign in to access your classrooms and meetings.</p>
                         </div>
 
+                        {/* TEMPORARY: Simple Login Form */}
+                        {/* <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                const name = (e.currentTarget.elements.namedItem('name') as HTMLInputElement).value;
+                                if (name) handleSimpleLogin(name);
+                            }}
+                            className="space-y-4 mt-6 pt-4 border-t border-gray-700/50"
+                        >
+                            <input
+                                type="text"
+                                name="name"
+                                placeholder="Your Name"
+                                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 outline-none"
+                                required
+                            />
+                            <button
+                                type="submit"
+                                className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold rounded-lg transition transform hover:scale-[1.02]"
+                            >
+                                Enter Classroom
+                            </button>
+                        </form> */}
+
+                        {/* Google Auth Disabled */}
                         <div className="flex justify-center mt-6 pt-4 border-t border-gray-700/50">
                             <div id="buttonDiv" className="w-full flex justify-center"></div>
                         </div>
+                        {/* */}
                     </div>
 
                     <div className="text-center text-xs text-gray-500 mt-8">
@@ -68,6 +114,7 @@ export default function LoginPage() {
                 </div>
             </div>
 
+            {/* */}
             <Script
                 src="https://accounts.google.com/gsi/client"
                 onLoad={() => {
@@ -89,6 +136,7 @@ export default function LoginPage() {
                     );
                 }}
             />
+            {/* */}
         </div>
     );
 }

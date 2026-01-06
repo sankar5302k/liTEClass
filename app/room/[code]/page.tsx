@@ -6,6 +6,7 @@ import MaterialViewer from '@/components/MaterialViewer';
 import AudioVisualizer from '@/components/AudioVisualizer';
 import ChatRoom from '@/components/ChatRoom';
 import ReactionOverlay from '@/components/ReactionOverlay';
+import Whiteboard from '@/components/Whiteboard';
 import { useRef } from 'react';
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
@@ -16,6 +17,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const [monitorSelf, setMonitorSelf] = useState(false);
     const [userName, setUserName] = useState<string>('Me');
     const [mobileTab, setMobileTab] = useState<'chat' | 'participants' | null>(null);
+    const [showWhiteboard, setShowWhiteboard] = useState(false);
 
     useEffect(() => {
         if (socket && participants.length > 0) {
@@ -157,6 +159,31 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             {/* Reaction Overlay */}
             <ReactionOverlay lastReaction={lastReaction} />
 
+            {/* Whiteboard Overlay */}
+            {showWhiteboard && (
+                <div className="fixed inset-0 z-40 md:static md:inset-auto md:w-1/3 md:border-l md:border-gray-800 md:flex flex-col bg-white text-black">
+                    {/* If mobile, this takes full screen. If desktop, it replaces the sidebar? 
+                        Wait, the sidebar is already 1/3. 
+                        Let's make it a modal overlay or replace the sidebar content.
+                        For a "separate, optional panel", replacing the sidebar or being an overlay is best.
+                        Let's make it an overlay centered or side panel.
+                        Given the layout, let's put it over the Materials/Chat section if on desktop, or full screen.
+                        Or simpler: Full screen overlay with transparency or just a centered modal box?
+                        The user asked for "separate panel".
+                        Let's try to make it an absolute overlay over the main content area (Audio Grid).
+                     */}
+                    <Whiteboard
+                        roomId={code}
+                        socket={socket}
+                        user={{ email: socket?.id, name: userName }} // socket.id is fallback
+                        onClose={() => setShowWhiteboard(false)}
+                    />
+                </div>
+            )}
+
+            {showWhiteboard && <div className="fixed inset-0 z-[39] bg-black/50 md:hidden" onClick={() => setShowWhiteboard(false)} />}
+
+
             {/* Control Bar */}
             <div className="h-20"> {/* Spacer */} </div>
             <ControlBar
@@ -169,6 +196,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 onToggleChat={() => setMobileTab(prev => prev === 'chat' ? null : 'chat')}
                 onToggleParticipants={() => setMobileTab(prev => prev === 'participants' ? null : 'participants')}
                 onSendReaction={sendReaction}
+                onToggleWhiteboard={() => setShowWhiteboard(prev => !prev)}
             />
         </div>
     );

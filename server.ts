@@ -7,6 +7,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import dbConnect from './lib/db.ts';
 import Room from './models/Room.ts';
 import Material from './models/Material.ts';
+import WhiteboardLog from './models/WhiteboardLog.ts';
 import fs from 'fs';
 import path from 'path';
 import { verifyToken } from './lib/auth.ts';
@@ -19,7 +20,7 @@ const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
-    let server: any; // Type 'any' to accommodate both http and https server variants
+    let server: ReturnType<typeof createHttpServer> | ReturnType<typeof createHttpsServer>;
     const certPath = path.join(process.cwd(), 'cert.pem');
     const keyPath = path.join(process.cwd(), 'key.pem');
     const useHttps = fs.existsSync(certPath) && fs.existsSync(keyPath);
@@ -196,6 +197,49 @@ app.prepare().then(() => {
             socket.to(data.roomId).emit('receive-message', data);
         });
 
+        // --- Whiteboard Events ---
+        socket.on('wb-join', async ({ roomId }) => {
+            try {
+                await dbConnect();
+                // Send existing history to the joined user
+                const logs = await WhiteboardLog.find({ roomId }).sort({ timestamp: 1 });
+                socket.emit('wb-history', logs);
+            } catch (e) {
+                console.error("Whiteboard join error", e);
+            }
+        });
+
+        socket.on('wb-event', async (eventData) => {
+            // eventData: { roomId, userId, type, data }
+            const { roomId } = eventData;
+            // Broadcast to others immediately (low latency)
+            socket.to(roomId).emit('wb-event', eventData);
+
+            // Persist async (doesn't block broadcast)
+            try {
+                await dbConnect();
+                await WhiteboardLog.create({
+                    roomId: eventData.roomId,
+                    userId: eventData.userId || socket.data.user?.email, // Fallback to auth user
+                    type: eventData.type,
+                    data: eventData.data
+                });
+            } catch (e) {
+                console.error("Whiteboard save error", e);
+            }
+        });
+
+        socket.on('wb-clear', async ({ roomId }) => {
+            // Ideally verify host here
+            try {
+                await dbConnect();
+                await WhiteboardLog.deleteMany({ roomId });
+                io.to(roomId).emit('wb-clear');
+            } catch (e) {
+                console.error("Whiteboard clear error", e);
+            }
+        });
+
         socket.on('disconnecting', async () => {
             const rooms = socket.rooms;
             rooms.forEach(async (roomId) => {
@@ -227,6 +271,7 @@ app.prepare().then(() => {
                     // Delete room and materials
                     await Room.deleteOne({ code: roomId });
                     await Material.deleteMany({ roomId });
+                    await WhiteboardLog.deleteMany({ roomId });
 
                     io.to(roomId).emit('meeting-ended');
                     io.to(roomId).disconnectSockets();
