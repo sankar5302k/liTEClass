@@ -81,7 +81,7 @@ export default function Home() {
         <h1 className="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">LiteClass</h1>
         <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-end">
           <div className="flex items-center gap-3">
-            <img src={user?.picture} alt={user?.name} className="w-10 h-10 rounded-full border-2 border-primary object-cover" />
+            <img src={user?.picture} alt={user?.name} className="w-10 h-10 rounded-full border-2 border-primary object-cover" referrerPolicy="no-referrer" />
             <span className="hidden sm:block font-medium">{user?.name}</span>
           </div>
           <button

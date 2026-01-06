@@ -9,9 +9,10 @@ interface ControlBarProps {
     onMaterialUploaded: () => void;
     onToggleChat: () => void;
     onToggleParticipants: () => void;
+    onSendReaction: (emoji: string) => void;
 }
 
-export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, roomId, onMaterialUploaded, onToggleChat, onToggleParticipants }: ControlBarProps) {
+export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, roomId, onMaterialUploaded, onToggleChat, onToggleParticipants, onSendReaction }: ControlBarProps) {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,8 +44,29 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
         }
     };
 
+    const [showReactions, setShowReactions] = useState(false);
+    const reactions = ['👍', '👏', '🎉', '😂', '😮', '😢', '❤️'];
+
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-4 flex justify-between items-center text-white">
+        <div className="fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-800 p-2 md:p-4 flex justify-between items-center text-white z-50">
+            {/* Reactions Popover */}
+            {showReactions && (
+                <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-800 border border-gray-700 rounded-full px-4 py-2 flex gap-2 shadow-xl animate-scale-up origin-bottom">
+                    {reactions.map(emoji => (
+                        <button
+                            key={emoji}
+                            onClick={() => {
+                                onSendReaction(emoji);
+                                setShowReactions(false);
+                            }}
+                            className="text-2xl hover:scale-125 transition transform"
+                        >
+                            {emoji}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             <div className="flex gap-4">
                 <button
                     onClick={toggleMute}
@@ -78,8 +100,29 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
+            {/* Center Controls */}
+            <div className="hidden md:flex gap-4 absolute left-1/2 transform -translate-x-1/2">
+                <button
+                    onClick={() => setShowReactions(!showReactions)}
+                    className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white relative"
+                    title="Reactions"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z" />
+                    </svg>
+                </button>
+            </div>
+
             {/* Mobile Toggles */}
-            <div className="flex gap-4 md:hidden">
+            <div className="flex gap-2 md:gap-4 md:hidden">
+                <button
+                    onClick={() => setShowReactions(!showReactions)}
+                    className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 0 1-6.364 0M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75Zm-.375 0h.008v.015h-.008V9.75Z" />
+                    </svg>
+                </button>
                 <button
                     onClick={onToggleParticipants}
                     className="p-3 rounded-full bg-gray-700 hover:bg-gray-600 text-white"
@@ -98,7 +141,7 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                 </button>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
                 {isHost && (
                     <>
                         <div className="relative flex items-center">
@@ -112,22 +155,22 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                             />
                             <label
                                 htmlFor="file-upload"
-                                className={`cursor-pointer px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-sm font-medium transition flex items-center justify-center ${uploading ? 'opacity-50' : ''}`}
+                                className={`cursor-pointer px-3 md:px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-xs md:text-sm font-medium transition flex items-center justify-center ${uploading ? 'opacity-50' : ''}`}
                             >
-                                {uploading ? 'Uploading...' : 'Share Material'}
+                                {uploading ? '...' : <><span className="md:hidden">Share</span><span className="hidden md:inline">Share Material</span></>}
                             </label>
                         </div>
 
                         <button
                             onClick={endMeeting}
-                            className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-sm font-medium transition flex items-center"
+                            className="px-3 md:px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-xs md:text-sm font-medium transition flex items-center"
                         >
-                            End Meeting
+                            <span className="md:hidden">End</span><span className="hidden md:inline">End Meeting</span>
                         </button>
                     </>
                 )}
                 {!isHost && (
-                    <a href="/" className="px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-sm font-medium transition">
+                    <a href="/" className="px-3 md:px-4 py-2 rounded bg-gray-700 hover:bg-gray-600 text-xs md:text-sm font-medium transition">
                         Leave
                     </a>
                 )}

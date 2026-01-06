@@ -315,11 +315,33 @@ export const useWebRTC = (roomId: string) => {
     };
 
     const endMeeting = () => {
-
+        // hostId is now checked on server via session
         socketRef.current?.emit('end-meeting', { roomId });
     };
 
-    return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current };
+    const sendReaction = (reaction: string) => {
+        console.log("sending ", reaction);
+        socketRef.current?.emit('send-reaction', { roomId, reaction });
+    };
+
+    const [lastReaction, setLastReaction] = useState<{ socketId: string, reaction: string, user?: any } | null>(null);
+
+    useEffect(() => {
+        if (!socketRef.current) return;
+
+        socketRef.current.on('reaction-received', (data: { socketId: string, reaction: string, user?: any }) => {
+            setLastReaction(data);
+            // Clear after animation duration (optional, or handle in UI)
+            setTimeout(() => setLastReaction(null), 3000);
+        });
+
+        return () => {
+            socketRef.current?.off('reaction-received');
+        }
+    }, [roomId]);
+
+
+    return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current, sendReaction, lastReaction };
 };
 
 const preferCodec = (sdp: string, codec: string) => {

@@ -5,12 +5,13 @@ import ControlBar from '@/components/ControlBar';
 import MaterialViewer from '@/components/MaterialViewer';
 import AudioVisualizer from '@/components/AudioVisualizer';
 import ChatRoom from '@/components/ChatRoom';
+import ReactionOverlay from '@/components/ReactionOverlay';
 import { useRef } from 'react';
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
     const resolvedParams = use(params);
     const { code } = resolvedParams;
-    const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket } = useWebRTC(code);
+    const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket, sendReaction, lastReaction } = useWebRTC(code);
     const [isHost, setIsHost] = useState(false);
     const [monitorSelf, setMonitorSelf] = useState(false);
     const [userName, setUserName] = useState<string>('Me');
@@ -117,7 +118,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                             {participants && participants.map((p) => (
                                 <li key={p.socketId} className="flex items-center gap-2 text-sm text-gray-300">
                                     <div className="w-8 h-8 rounded-full bg-gray-600 overflow-hidden">
-                                        {p.user?.picture ? <img src={p.user.picture} alt={p.user.name} /> : <div className="w-full h-full flex items-center justify-center text-xs">{p.user?.name?.[0]}</div>}
+                                        {p.user?.picture ? <img src={p.user.picture} alt={p.user.name} referrerPolicy="no-referrer" /> : <div className="w-full h-full flex items-center justify-center text-xs">{p.user?.name?.[0]}</div>}
                                     </div>
                                     <span>{p.user?.name || 'Unknown'}</span>
                                     {p.isHost && <span className="text-xs bg-blue-900 text-blue-200 px-1 rounded">Host</span>}
@@ -153,6 +154,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 </div>
             </div>
 
+            {/* Reaction Overlay */}
+            <ReactionOverlay lastReaction={lastReaction} />
+
             {/* Control Bar */}
             <div className="h-20"> {/* Spacer */} </div>
             <ControlBar
@@ -164,6 +168,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 onMaterialUploaded={handleMaterialUploaded}
                 onToggleChat={() => setMobileTab(prev => prev === 'chat' ? null : 'chat')}
                 onToggleParticipants={() => setMobileTab(prev => prev === 'participants' ? null : 'participants')}
+                onSendReaction={sendReaction}
             />
         </div>
     );

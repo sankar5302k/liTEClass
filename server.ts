@@ -182,6 +182,15 @@ app.prepare().then(() => {
             });
         });
 
+        socket.on('send-reaction', ({ roomId, reaction }) => {
+            const user = socket.data.user;
+            io.to(roomId).emit('reaction-received', {
+                socketId: socket.id,
+                reaction,
+                user: user ? { name: user.name, picture: user.picture } : undefined
+            });
+        });
+
         socket.on('send-message', (data) => {
             // Broadcast to everyone else (sender updates optimistically)
             socket.to(data.roomId).emit('receive-message', data);
