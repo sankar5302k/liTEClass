@@ -65,7 +65,7 @@ export const useWebRTC = (roomId: string) => {
 
             setPeers(prev => prev.map(p => {
                 const participant = updatedParticipants.find(up => up.socketId === p.id);
-                if (participant) return { ...p, isMuted: participant.isMuted };
+                if (participant) return { ...p, isMuted: participant.isMuted, user: participant.user };
                 return p;
             }));
 
