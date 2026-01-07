@@ -74,7 +74,8 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
 
                         {peers.map((peer) => {
                             // @ts-ignore
-                            const peerName = peer.user?.name || `Peer ${peer.id.slice(0, 4)}`;
+                            const participantInfo = participants.find(p => p.socketId === peer.id);
+                            const peerName = participantInfo?.user?.name || (peer as any).user?.name || `Peer ${peer.id.slice(0, 4)}`;
                             return (
                                 <AudioVisualizer
                                     key={peer.id}
@@ -151,8 +152,9 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                     <Whiteboard
                         roomId={code}
                         socket={socket}
-                        user={{ email: socket?.id, name: userName }} // socket.id is fallback
+                        user={{ email: socket?.id, name: userName }} 
                         onClose={() => setShowWhiteboard(false)}
+                        isHost={isHost}
                     />
                 </div>
             )}
@@ -160,7 +162,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             {showWhiteboard && <div className="fixed inset-0 z-[39] bg-black/50 md:hidden" onClick={() => setShowWhiteboard(false)} />}
 
 
-            <div className="h-20"> {/* Spacer */} </div>
+            <div className="h-20"> </div>
             <ControlBar
                 isMuted={isMuted}
                 toggleMute={toggleMute}

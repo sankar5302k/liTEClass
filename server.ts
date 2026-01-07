@@ -215,12 +215,22 @@ app.prepare().then(() => {
 
             try {
                 await dbConnect();
-                await WhiteboardLog.create({
-                    roomId: eventData.roomId,
-                    userId: eventData.userId || socket.data.user?.email,
-                    type: eventData.type,
-                    data: eventData.data
-                });
+
+                if (eventData.type === 'erase_object') {
+                   
+                    await WhiteboardLog.deleteOne({
+                        roomId: eventData.roomId,
+                        'data.id': eventData.data.strokeId
+                    });
+                    
+                } else {
+                    await WhiteboardLog.create({
+                        roomId: eventData.roomId,
+                        userId: eventData.userId || socket.data.user?.email,
+                        type: eventData.type,
+                        data: eventData.data
+                    });
+                }
             } catch (e) {
                 console.error("Whiteboard save error", e);
             }
