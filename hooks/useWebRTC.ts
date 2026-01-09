@@ -20,6 +20,26 @@ export const useWebRTC = (roomId: string) => {
     const [participants, setParticipants] = useState<any[]>([]);
     const [myStream, setMyStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
+
+    // Poll State
+    const [pollState, setPollState] = useState<{
+        isActive: boolean;
+        question: string;
+        options: string[];
+        duration: number;
+        correctOptionIndex?: number;
+        id?: string;
+    } | null>(null);
+
+    // ... (rest of hook)
+
+    // ... (rest of hook)
+
+    const [pollResults, setPollResults] = useState<{
+        results: number[];
+        totalVotes: number;
+    } | null>(null);
+
     const peersRef = useRef<{ [key: string]: RTCPeerConnection }>({});
     const processingQueue = useRef<{ [key: string]: Promise<void> }>({});
     const candidateQueue = useRef<{ [key: string]: RTCIceCandidateInit[] }>({});
@@ -47,6 +67,7 @@ export const useWebRTC = (roomId: string) => {
             if (myStreamRef.current) {
                 console.log(`[Client] Emitting join-room ${roomId} (from connect)`);
                 socketRef.current?.emit('join-room', { roomId });
+                socketRef.current?.emit('get-active-poll', { roomId });
             }
         });
 
@@ -195,6 +216,19 @@ export const useWebRTC = (roomId: string) => {
             window.location.href = '/';
         });
 
+        // Poll listeners
+        socketRef.current.on('poll-started', (data: any) => {
+            console.log("Poll started", data);
+            setPollState({ ...data, isActive: true });
+            setPollResults(null);
+        });
+
+        socketRef.current.on('poll-ended', (data: any) => {
+            console.log("Poll ended", data);
+            setPollState(prev => prev ? { ...prev, isActive: false } : null);
+            setPollResults(data);
+        });
+
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             alert("Microphone access blocked. Browser requires a Secure Context (HTTPS or localhost).");
             console.error("navigator.mediaDevices is undefined.");
@@ -220,6 +254,7 @@ export const useWebRTC = (roomId: string) => {
                 if (socketRef.current?.connected) {
                     console.log(`[Client] Emitting join-room ${roomId} (from getUserMedia)`);
                     socketRef.current.emit('join-room', { roomId });
+                    socketRef.current.emit('get-active-poll', { roomId });
                 }
             })
             .catch(err => {
@@ -313,6 +348,15 @@ export const useWebRTC = (roomId: string) => {
         socketRef.current?.emit('send-reaction', { roomId, reaction });
     };
 
+    const createPoll = (question: string, options: string[], duration: number, correctOptionIndex: number) => {
+        socketRef.current?.emit('create-poll', { roomId, question, options, duration, correctOptionIndex });
+    };
+
+    const submitVote = (optionIndex: number) => {
+        if (!pollState?.id) return;
+        socketRef.current?.emit('submit-vote', { pollId: pollState.id, optionIndex });
+    };
+
     const [lastReaction, setLastReaction] = useState<{ socketId: string, reaction: string, user?: any } | null>(null);
 
     useEffect(() => {
@@ -329,7 +373,9 @@ export const useWebRTC = (roomId: string) => {
     }, [roomId]);
 
 
-    return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current, sendReaction, lastReaction };
+    const clearPollResults = () => setPollResults(null);
+
+    return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current, sendReaction, lastReaction, pollState, pollResults, createPoll, submitVote, clearPollResults };
 };
 
 const preferCodec = (sdp: string, codec: string) => {

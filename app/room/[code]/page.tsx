@@ -7,15 +7,17 @@ import AudioVisualizer from '@/components/AudioVisualizer';
 import ChatRoom from '@/components/ChatRoom';
 import ReactionOverlay from '@/components/ReactionOverlay';
 import Whiteboard from '@/components/Whiteboard';
+import PollOverlay from '@/components/PollOverlay';
 
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
     const resolvedParams = use(params);
     const { code } = resolvedParams;
-    const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket, sendReaction, lastReaction } = useWebRTC(code);
+    const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket, sendReaction, lastReaction, pollState, pollResults, createPoll, submitVote, clearPollResults } = useWebRTC(code);
     const [isHost, setIsHost] = useState(false);
     const [monitorSelf, setMonitorSelf] = useState(false);
     const [userName, setUserName] = useState<string>('Me');
     const [showWhiteboard, setShowWhiteboard] = useState(false);
+    const [showPollCreation, setShowPollCreation] = useState(false);
 
     // Unified Sidebar state
     // Default to 'chat' on desktop for better engagement, closed on mobile
@@ -247,6 +249,17 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
 
             <ReactionOverlay lastReaction={lastReaction} />
 
+            <PollOverlay
+                isHost={isHost}
+                showCreation={showPollCreation}
+                onCloseCreation={() => setShowPollCreation(false)}
+                pollState={pollState}
+                pollResults={pollResults}
+                onCreatePoll={createPoll}
+                onVote={submitVote}
+                onCloseResults={clearPollResults}
+            />
+
             {showWhiteboard && (
                 <div className="fixed inset-0 z-50 md:static md:inset-auto md:w-1/3 md:border-l md:border-gray-800 md:flex flex-col bg-white text-black">
                     {/* Close button for whiteboard if full screen */}
@@ -285,6 +298,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                 onToggleParticipants={() => toggleTab('participants')}
                 onSendReaction={sendReaction}
                 onToggleWhiteboard={() => setShowWhiteboard(prev => !prev)}
+                onTogglePoll={() => setShowPollCreation(prev => !prev)}
             />
         </div>
     );

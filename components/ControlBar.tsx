@@ -11,9 +11,10 @@ interface ControlBarProps {
     onToggleParticipants: () => void;
     onSendReaction: (emoji: string) => void;
     onToggleWhiteboard: () => void;
+    onTogglePoll: () => void;
 }
 
-export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, roomId, onMaterialUploaded, onToggleChat, onToggleParticipants, onSendReaction, onToggleWhiteboard }: ControlBarProps) {
+export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, roomId, onMaterialUploaded, onToggleChat, onToggleParticipants, onSendReaction, onToggleWhiteboard, onTogglePoll }: ControlBarProps) {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -180,6 +181,17 @@ export default function ControlBar({ isMuted, toggleMute, isHost, endMeeting, ro
                                 )}
                             </label>
                         </div>
+
+                        <button
+                            onClick={onTogglePoll}
+                            className="w-8 h-8 md:w-auto md:h-auto md:px-5 md:py-2.5 rounded-xl md:rounded-full bg-indigo-600/90 hover:bg-indigo-600 text-white text-sm font-semibold transition flex items-center justify-center border border-indigo-500/50 hover:shadow-lg hover:shadow-indigo-500/20"
+                            title="Create Poll"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 md:mr-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+                            </svg>
+                            <span className="hidden md:inline">Poll</span>
+                        </button>
 
                         <button
                             onClick={endMeeting}

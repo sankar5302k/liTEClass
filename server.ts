@@ -8,6 +8,7 @@ import dbConnect from './lib/db.ts';
 import Room from './models/Room.ts';
 import Material from './models/Material.ts';
 import WhiteboardLog from './models/WhiteboardLog.ts';
+import Poll from './models/Poll.ts';
 import fs from 'fs';
 import path from 'path';
 import { verifyToken } from './lib/auth.ts';
@@ -59,7 +60,7 @@ app.prepare().then(() => {
         path: '/socket.io',
         addTrailingSlash: false,
         cors: {
-            origin: process.env.CLIENT_URL || "http://localhost:3000", // Allow Vercel URL/localhost
+            origin: process.env.CLIENT_URL || "http://localhost:3000",
             methods: ["GET", "POST"],
             credentials: true
         }
@@ -217,12 +218,12 @@ app.prepare().then(() => {
                 await dbConnect();
 
                 if (eventData.type === 'erase_object') {
-                   
+
                     await WhiteboardLog.deleteOne({
                         roomId: eventData.roomId,
                         'data.id': eventData.data.strokeId
                     });
-                    
+
                 } else {
                     await WhiteboardLog.create({
                         roomId: eventData.roomId,
@@ -244,6 +245,138 @@ app.prepare().then(() => {
                 io.to(roomId).emit('wb-clear');
             } catch (e) {
                 console.error("Whiteboard clear error", e);
+            }
+        });
+
+        // --- Poll Events ---
+        socket.on('create-poll', async (pollData) => {
+            try {
+                await dbConnect();
+                // Validate host is nice but trusting client for now based on room logic
+                // Ideally check room.hostId === socket.data.user.email
+
+                const newPoll = await Poll.create({
+                    roomId: pollData.roomId,
+                    question: pollData.question,
+                    options: pollData.options,
+                    duration: pollData.duration,
+                    correctOptionIndex: pollData.correctOptionIndex,
+                    isActive: true,
+                    votes: []
+                });
+
+                // Broadcast start
+                io.to(pollData.roomId).emit('poll-started', {
+                    id: newPoll._id,
+                    question: newPoll.question,
+                    options: newPoll.options,
+                    duration: newPoll.duration,
+                    correctOptionIndex: newPoll.correctOptionIndex
+                });
+
+                // Auto end poll
+                setTimeout(async () => {
+                    const poll = await Poll.findById(newPoll._id);
+                    if (poll && poll.isActive) {
+                        poll.isActive = false;
+                        await poll.save();
+
+                        // Aggregate results
+                        const votes = poll.votes || [];
+                        const results = new Array(poll.options.length).fill(0);
+                        votes.forEach((v: any) => {
+                            if (v.optionIndex >= 0 && v.optionIndex < results.length) {
+                                results[v.optionIndex]++;
+                            }
+                        });
+
+                        io.to(pollData.roomId).emit('poll-ended', {
+                            id: newPoll._id,
+                            results,
+                            totalVotes: votes.length
+                        });
+                    }
+                }, pollData.duration * 1000);
+
+            } catch (e) {
+                console.error("Create poll error", e);
+            }
+        });
+
+        socket.on('submit-vote', async ({ pollId, optionIndex }) => {
+            try {
+                await dbConnect();
+                const poll = await Poll.findById(pollId);
+                if (poll && poll.isActive) {
+                    const userId = socket.data.user?.email || socket.id; // Use email if logged in, else socketId
+
+                    // Check if already voted
+                    const hasVoted = poll.votes.some((v: any) => v.userId === userId);
+                    if (hasVoted) return;
+
+                    poll.votes.push({ userId, optionIndex });
+                    await poll.save();
+                }
+            } catch (e) {
+                console.error("Vote error", e);
+            }
+        });
+
+        socket.on('end-poll-manual', async ({ pollId, roomId }) => {
+            try {
+                await dbConnect();
+                const poll = await Poll.findById(pollId);
+                if (poll && poll.isActive) {
+                    poll.isActive = false;
+                    await poll.save();
+
+                    const votes = poll.votes || [];
+                    const results = new Array(poll.options.length).fill(0);
+                    votes.forEach((v: any) => {
+                        if (v.optionIndex >= 0 && v.optionIndex < results.length) {
+                            results[v.optionIndex]++;
+                        }
+                    });
+
+                    io.to(roomId).emit('poll-ended', {
+                        id: poll._id,
+                        results,
+                        totalVotes: votes.length
+                    });
+                }
+            } catch (e) {
+                console.error("End poll manual error", e);
+            }
+        });
+
+        // Handling late joiners
+        socket.on('get-active-poll', async ({ roomId }) => {
+            try {
+                await dbConnect();
+                // Find the most recent active poll
+                const poll = await Poll.findOne({ roomId, isActive: true }).sort({ createdAt: -1 });
+                if (poll) {
+                    // Calculate remaining time? Client can just resync or receive duration. 
+                    // Ideally we send remaining time.
+                    const elapsed = (Date.now() - new Date(poll.createdAt).getTime()) / 1000;
+                    const remaining = Math.max(0, poll.duration - elapsed);
+
+                    if (remaining > 0) {
+                        socket.emit('poll-started', {
+                            id: poll._id,
+                            question: poll.question,
+                            options: poll.options,
+                            duration: remaining, // Send remaining sec so client timer matches roughly
+                            correctOptionIndex: poll.correctOptionIndex
+                        });
+                    } else {
+                        // Should have ended.
+                        poll.isActive = false;
+                        await poll.save();
+                    }
+                }
+            } catch (e) {
+                console.error("Get active poll error", e);
             }
         });
 
