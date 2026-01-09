@@ -5,6 +5,8 @@ export interface IRoom extends Document {
     hostId: string;
     active: boolean;
     participants: string[];
+    waitingRoom: string[];
+    whiteboardAccess: string[];
     createdAt: Date;
 }
 
@@ -13,6 +15,8 @@ const RoomSchema: Schema = new Schema({
     hostId: { type: String, required: true },
     active: { type: Boolean, default: true },
     participants: { type: [String], default: [] },
+    waitingRoom: { type: [String], default: [] },
+    whiteboardAccess: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now, expires: '24h' },
 });
 

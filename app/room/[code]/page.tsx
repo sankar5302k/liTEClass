@@ -12,7 +12,12 @@ import PollOverlay from '@/components/PollOverlay';
 export default function RoomPage({ params }: { params: Promise<{ code: string }> }) {
     const resolvedParams = use(params);
     const { code } = resolvedParams;
-    const { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket, sendReaction, lastReaction, pollState, pollResults, createPoll, submitVote, clearPollResults } = useWebRTC(code);
+
+    const {
+        peers, participants, myStream, toggleMute, isMuted, endMeeting, socket,
+        sendReaction, lastReaction, pollState, pollResults, createPoll, submitVote, clearPollResults,
+        waitingStatus, waitingList, canWriteWb, hostActions
+    } = useWebRTC(code);
     const [isHost, setIsHost] = useState(false);
     const [monitorSelf, setMonitorSelf] = useState(false);
     const [userName, setUserName] = useState<string>('Me');
@@ -49,6 +54,26 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
     const toggleTab = (tab: 'chat' | 'materials' | 'participants') => {
         setActiveTab(prev => prev === tab ? null : tab);
     };
+
+    if (waitingStatus === 'waiting') {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-black text-white">
+                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
+                <h2 className="text-2xl font-bold mb-2">Waiting for Host</h2>
+                <p className="text-gray-400">Please wait, the host will let you in shortly.</p>
+            </div>
+        );
+    }
+
+    if (waitingStatus === 'denied') {
+        return (
+            <div className="flex flex-col items-center justify-center h-screen bg-black text-white">
+                <h2 className="text-2xl font-bold mb-2 text-red-500">Access Denied</h2>
+                <p className="text-gray-400">The host has denied your request to join.</p>
+                <a href="/" className="mt-6 px-6 py-2 bg-gray-800 rounded-full hover:bg-gray-700 transition">Go Home</a>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col h-screen bg-black text-white overflow-hidden font-sans selection:bg-blue-500/30">
@@ -195,6 +220,42 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                             {/* Participants Tab */}
                             <div className={`absolute inset-0 overflow-y-auto p-0 transition-opacity duration-300 ${activeTab === 'participants' ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
                                 <div className="p-4">
+                                    {/* Waiting Room Section (Host Only) */}
+                                    {isHost && waitingList.length > 0 && (
+                                        <div className="mb-6">
+                                            <h3 className="text-xs font-bold text-yellow-500 uppercase tracking-widest mb-3 px-2 flex justify-between items-center">
+                                                <span>Waiting Room ({waitingList.length})</span>
+                                            </h3>
+                                            <ul className="space-y-2">
+                                                {waitingList.map((w) => (
+                                                    <li key={w.socketId} className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-yellow-500/10">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">
+                                                                {w.user?.name?.[0]?.toUpperCase()}
+                                                            </div>
+                                                            <span className="text-sm font-medium text-gray-200">{w.user?.name || 'Unknown'}</span>
+                                                        </div>
+                                                        <div className="flex gap-2 mt-1">
+                                                            <button
+                                                                onClick={() => hostActions.approveUser(w.user.email)}
+                                                                className="flex-1 py-1.5 bg-green-600/20 text-green-400 text-xs font-bold rounded hover:bg-green-600/30 transition"
+                                                            >
+                                                                APPROVE
+                                                            </button>
+                                                            <button
+                                                                onClick={() => hostActions.denyUser(w.user.email)}
+                                                                className="flex-1 py-1.5 bg-red-600/20 text-red-400 text-xs font-bold rounded hover:bg-red-600/30 transition"
+                                                            >
+                                                                DENY
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <div className="my-4 border-b border-white/5"></div>
+                                        </div>
+                                    )}
+
                                     <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-4 px-2">Participants</h3>
                                     <ul className="space-y-1">
                                         {participants.map((p) => (
@@ -222,13 +283,53 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    {p.isMuted ? (
+                                                    {isHost && !p.isHost && (
+                                                        <>
+                                                            {/* Whiteboard Access Toggle */}
+                                                            <button
+                                                                onClick={() => hostActions.toggleWbAccess(p.user.email)}
+                                                                className={`p-1.5 rounded-lg transition ${p.canWriteWb ? 'text-blue-400 bg-blue-400/10' : 'text-gray-600 hover:text-gray-400'}`}
+                                                                title={p.canWriteWb ? "Revoke Whiteboard Access" : "Grant Whiteboard Access"}
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+                                                                </svg>
+                                                            </button>
+
+                                                            {/* Kick Button */}
+                                                            <button
+                                                                onClick={() => hostActions.kickUser(p.user.email, p.socketId)}
+                                                                className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-400/10 transition"
+                                                                title="Kick User"
+                                                            >
+                                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
+                                                                </svg>
+                                                            </button>
+                                                        </>
+                                                    )}
+
+                                                    {/* Mute Indicator / Control */}
+                                                    {isHost && !p.isHost && !p.isMuted ? (
+                                                        <button
+                                                            onClick={() => hostActions.remoteMute(p.socketId)}
+                                                            className="w-8 h-8 rounded-full bg-green-500/10 text-green-400 hover:bg-red-500/10 hover:text-red-400 flex items-center justify-center transition"
+                                                            title="Mute User"
+                                                        >
+                                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                                                <path d="M10 2a6 6 0 0 0-6 6v3.586l-.707.707A1 1 0 0 0 4 14h12a1 1 0 0 0 .707-1.707L16 11.586V8a6 6 0 0 0-6-6Z" />
+                                                            </svg>
+                                                        </button>
+                                                    ) : p.isMuted ? (
                                                         <div className="w-8 h-8 rounded-full bg-red-500/10 text-red-400 flex items-center justify-center">
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                                                                 <path d="M9.383 3.076A1 1 0 0 1 10 4v12a1 1 0 0 1-1.707.707L4.586 13H2a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h2.586l3.707-3.707a1 1 0 0 1 1.09-.217ZM14.657 2.929a1 1 0 0 1 1.414 0A9.972 9.972 0 0 1 19 10a9.972 9.972 0 0 1-2.929 7.071 1 1 0 0 1-1.414-1.414A7.971 7.971 0 0 0 17 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 0 1 0-1.414Zm-2.829 2.828a1 1 0 0 1 1.415 0A5.983 5.983 0 0 1 15 10a5.984 5.984 0 0 1-1.757 4.243 1 1 0 0 1-1.415-1.415A3.984 3.984 0 0 0 13 10a3.983 3.983 0 0 0-1.172-2.828 1 1 0 0 1 0-1.415Z" />
                                                             </svg>
                                                         </div>
                                                     ) : (
+                                                        // Fallback for non-host viewing active mic, or other host viewing host mic? 
+                                                        // Actually if p.isMuted is false and we are NOT host (or p is host), show active
+                                                        // Just revert to original for non-actionable cases
                                                         <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center animate-pulse">
                                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
                                                                 <path d="M10 2a6 6 0 0 0-6 6v3.586l-.707.707A1 1 0 0 0 4 14h12a1 1 0 0 0 .707-1.707L16 11.586V8a6 6 0 0 0-6-6Z" />
@@ -277,6 +378,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
                         user={{ email: socket?.id, name: userName }}
                         onClose={() => setShowWhiteboard(false)}
                         isHost={isHost}
+                        canWrite={canWriteWb || isHost}
                     />
                 </div>
             )}

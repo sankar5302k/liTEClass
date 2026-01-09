@@ -128,36 +128,150 @@ app.prepare().then(() => {
                     return;
                 }
 
-                socket.join(roomId);
-                console.log(`[Server] Socket ${socket.id} joined room ${roomId}`);
-
-
-                await Room.updateOne(
-                    { code: roomId },
-                    { $addToSet: { participants: user.email } }
-                );
-                console.log(`[Server] DB updated for room ${roomId}`);
-
                 const isHost = room.hostId === user.email;
+                // Check if already participant or is host
+                const isApproved = isHost || room.participants.includes(user.email);
 
+                if (isApproved) {
+                    // Cleanup waiting room if they were there
+                    if (room.waitingRoom.includes(user.email)) {
+                        await Room.updateOne({ code: roomId }, { $pull: { waitingRoom: user.email } });
+                    }
 
-                console.log(`[Join] notifying room ${roomId} about ${user.email} (${socket.id})`);
-                socket.to(roomId).emit('user-connected', { userId: socket.id, user, isHost });
+                    // STANDARD JOIN
+                    socket.join(roomId);
+                    console.log(`[Server] Socket ${socket.id} joined room ${roomId}`);
 
+                    await Room.updateOne(
+                        { code: roomId },
+                        { $addToSet: { participants: user.email } }
+                    );
 
-                const sockets = await io.in(roomId).fetchSockets();
-                const participants = sockets.map(s => ({
-                    socketId: s.id,
-                    user: s.data.user,
-                    isHost: room.hostId === s.data.user.email,
-                    isMuted: s.data.isMuted || false
-                }));
+                    // Notify room
+                    socket.to(roomId).emit('user-connected', { userId: socket.id, user, isHost });
 
-                io.to(roomId).emit('participants-update', participants);
+                    // Send WB permissions
+                    const wbAccess = room.whiteboardAccess || [];
+                    const canWrite = isHost || wbAccess.includes(user.email);
+                    socket.emit('wb-permissions-update', { canWrite });
 
-                console.log(`User ${user.email} joined room ${roomId}`);
+                    await broadcastRoomUpdate(io, roomId);
+                    console.log(`User ${user.email} joined room ${roomId}`);
+
+                } else {
+                    // WAITING ROOM
+                    console.log(`[Server] User ${user.email} added to waiting room for ${roomId}`);
+                    await Room.updateOne(
+                        { code: roomId },
+                        { $addToSet: { waitingRoom: user.email } }
+                    );
+                    socket.join(`${roomId}-waiting`); // Join waiting channel for updates if needed (or just direct socket)
+                    socket.emit('waiting-for-approval');
+
+                    // Notify Host
+                    await notifyHostOfWaitingList(io, roomId);
+                }
+
             } catch (e) {
                 console.error("Join error", e);
+            }
+        });
+
+        socket.on('host-action', async (data) => {
+            const { action, roomId, targetId, targetEmail } = data; // targetId is socketId if available, targetEmail for DB ops
+            const user = socket.data.user;
+            if (!user) return;
+
+            await dbConnect();
+            const room = await Room.findOne({ code: roomId });
+            if (!room || room.hostId !== user.email) {
+                socket.emit('error', 'Unauthorized host action');
+                return;
+            }
+
+            if (action === 'approve-user') {
+                await Room.updateOne({ code: roomId }, {
+                    $pull: { waitingRoom: targetEmail },
+                    $addToSet: { participants: targetEmail }
+                });
+
+                // Find socket of waiting user? 
+                // They haven't joined the room yet, so we can't search room.
+                // But we can try to find by user.email in connected sockets if we tracked them, 
+                // OR rely on them re-joining or listen to a specific event?
+                // Better: We stored them in waitingRoom list. 
+                // They are connected and stuck in 'waiting-for-approval'.
+                // Use io.fetchSockets() to find them? Or just broadcast to `${roomId}-waiting`?
+                // We need to target specific user.
+                // Wait, we don't know their socketId easily unless we store it.
+                // BUT, if they are in `${roomId}-waiting`, we can find them there.
+
+                const waitingSockets = await io.in(`${roomId}-waiting`).fetchSockets();
+                const targetSocket = waitingSockets.find(s => s.data.user?.email === targetEmail);
+
+                if (targetSocket) {
+                    targetSocket.leave(`${roomId}-waiting`);
+                    // Emit granted, client will re-emit 'join-room' or we force join here?
+                    // Client re-emit is safer for state sync.
+                    targetSocket.emit('access-granted');
+                }
+
+                await notifyHostOfWaitingList(io, roomId);
+
+            } else if (action === 'deny-user') {
+                await Room.updateOne({ code: roomId }, { $pull: { waitingRoom: targetEmail } });
+                const waitingSockets = await io.in(`${roomId}-waiting`).fetchSockets();
+                const targetSocket = waitingSockets.find(s => s.data.user?.email === targetEmail);
+                if (targetSocket) {
+                    targetSocket.emit('access-denied');
+                    targetSocket.disconnect();
+                }
+                await notifyHostOfWaitingList(io, roomId);
+
+            } else if (action === 'kick-user') {
+                await Room.updateOne({ code: roomId }, {
+                    $pull: { participants: targetEmail, whiteboardAccess: targetEmail }
+                });
+
+                const roomSockets = await io.in(roomId).fetchSockets();
+                const targetSocket = roomSockets.find(s => s.id === targetId || s.data.user?.email === targetEmail);
+
+                if (targetSocket) {
+                    targetSocket.emit('kicked');
+                    targetSocket.disconnect();
+                }
+                await broadcastRoomUpdate(io, roomId);
+
+            } else if (action === 'toggle-wb-access') {
+                const isAllowed = room.whiteboardAccess.includes(targetEmail);
+                if (isAllowed) {
+                    await Room.updateOne({ code: roomId }, { $pull: { whiteboardAccess: targetEmail } });
+                } else {
+                    await Room.updateOne({ code: roomId }, { $addToSet: { whiteboardAccess: targetEmail } });
+                }
+
+                // Notify specific user
+                const roomSockets = await io.in(roomId).fetchSockets();
+                const targetSocket = roomSockets.find(s => s.data.user?.email === targetEmail);
+                if (targetSocket) {
+                    targetSocket.emit('wb-permissions-update', { canWrite: !isAllowed });
+                }
+                // Notify host/room of updated permissions if needed? 
+                // Maybe just broadcast room update to refresh participant lists which might show icons
+                await broadcastRoomUpdate(io, roomId);
+            } else if (action === 'mute-user') {
+                // Force mute a user
+                const roomSockets = await io.in(roomId).fetchSockets();
+                const targetSocket = roomSockets.find(s => s.id === targetId);
+                if (targetSocket) {
+                    targetSocket.data.isMuted = true;
+                    targetSocket.emit('force-mute');
+                    // Broadcast update
+                    io.to(roomId).emit('user-toggled-mute', {
+                        socketId: targetSocket.id,
+                        isMuted: true
+                    });
+                }
             }
         });
 
@@ -383,21 +497,18 @@ app.prepare().then(() => {
         socket.on('disconnecting', async () => {
             const rooms = socket.rooms;
             rooms.forEach(async (roomId) => {
-                if (roomId !== socket.id) {
+                if (roomId !== socket.id && !roomId.endsWith('-waiting')) {
                     socket.to(roomId).emit('user-disconnected', socket.id);
-
-
-                    const sockets = await io.in(roomId).fetchSockets();
-                    const participants = sockets
-                        .filter(s => s.id !== socket.id)
-                        .map(s => ({
-                            socketId: s.id,
-                            user: s.data.user,
-                            isHost: false,
-                            isMuted: s.data.isMuted || false
-                        }));
-                    io.to(roomId).emit('participants-update', participants);
+                    // Also trigger update
+                    // We need io here, but socket.to(roomId) works. 
+                    // To do full broadcastRoomUpdate, we need the function. 
+                    // Inside callback, we can't easily access 'io' unless we pass it or capture it. 'io' is in scope.
+                    broadcastRoomUpdate(io, roomId);
                 }
+
+
+                // Old update logic removed in favor of broadcastRoomUpdate call above
+
             });
         });
 
@@ -430,3 +541,48 @@ app.prepare().then(() => {
         console.log(`> Ready on ${proto}://${hostname}:${port}`);
     });
 });
+
+async function broadcastRoomUpdate(io: any, roomId: string) {
+    await dbConnect();
+    const room = await Room.findOne({ code: roomId });
+    if (!room) return;
+
+    const sockets = await io.in(roomId).fetchSockets();
+    // Get WB access list
+    const wbAccess = room.whiteboardAccess || [];
+
+    const participants = sockets.map((s: any) => ({
+        socketId: s.id,
+        user: s.data.user,
+        isHost: room.hostId === s.data.user.email,
+        isMuted: s.data.isMuted || false,
+        canWriteWb: (room.hostId === s.data.user.email) || wbAccess.includes(s.data.user.email)
+    }));
+
+    io.to(roomId).emit('participants-update', participants);
+}
+
+async function notifyHostOfWaitingList(io: any, roomId: string) {
+    await dbConnect();
+    const room = await Room.findOne({ code: roomId });
+    if (!room) return;
+
+    const waitingUsersEntries = room.waitingRoom || [];
+    // We want to send full user info if possible, but waitingRoom only has emails.
+    // For now, send emails. The host UI can toggle based on email or we might need to fetch user details?
+    // User details are better. But we don't have a Users collection easily accessible or we have to query sockets?
+    // Waiting sockets are in `${roomId}-waiting`.
+    const waitingSockets = await io.in(`${roomId}-waiting`).fetchSockets();
+    const waitingList = waitingSockets.map((s: any) => ({
+        socketId: s.id,
+        user: s.data.user
+    }));
+
+    // Find host socket
+    const roomSockets = await io.in(roomId).fetchSockets();
+    const hostSocket = roomSockets.find((s: any) => s.data.user.email === room.hostId);
+
+    if (hostSocket) {
+        hostSocket.emit('waiting-list-update', waitingList);
+    }
+}

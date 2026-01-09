@@ -21,6 +21,12 @@ export const useWebRTC = (roomId: string) => {
     const [myStream, setMyStream] = useState<MediaStream | null>(null);
     const [isMuted, setIsMuted] = useState(false);
 
+    // Host Control States
+    const [waitingStatus, setWaitingStatus] = useState<'joined' | 'waiting' | 'denied'>('joined'); // Default joined until told otherwise
+    const [waitingList, setWaitingList] = useState<any[]>([]);
+    const [canWriteWb, setCanWriteWb] = useState(false); // Default false until told true (unless host)
+
+
     // Poll State
     const [pollState, setPollState] = useState<{
         isActive: boolean;
@@ -83,16 +89,73 @@ export const useWebRTC = (roomId: string) => {
             console.log('Participants updated:', updatedParticipants);
             setParticipants(updatedParticipants);
 
+            // Auto-detect if I am host or have permissions from list?
+            // Actually 'wb-permissions-update' is more reliable for real-time toggle.
+            // But initial state can be derived.
+            const myId = socketRef.current?.id;
+            const me = updatedParticipants.find(p => p.socketId === myId);
+            if (me) {
+                currentUserRef.current = me.user;
+                // If I am showing up in participants list, I have joined.
+                setWaitingStatus('joined');
+                if (me.canWriteWb !== undefined) setCanWriteWb(me.canWriteWb);
+            }
 
             setPeers(prev => prev.map(p => {
                 const participant = updatedParticipants.find(up => up.socketId === p.id);
                 if (participant) return { ...p, isMuted: participant.isMuted, user: participant.user };
                 return p;
             }));
+        });
 
-            const myId = socketRef.current?.id;
-            const me = updatedParticipants.find(p => p.socketId === myId);
-            if (me) currentUserRef.current = me.user;
+        // Host Control Events
+        socketRef.current.on('waiting-for-approval', () => {
+            console.log("In Waiting Room");
+            setWaitingStatus('waiting');
+        });
+
+        socketRef.current.on('access-granted', () => {
+            console.log("Access Granted!");
+            setWaitingStatus('joined');
+            // Re-join logic might be needed if socket left room channel, 
+            // but server logic keeps them in waiting channel until we act?
+            // Actually server side: we told client to 'join-room' again? 
+            // No, in server 'approve-user' we just updated DB. 
+            // But client needs to join socket room 'roomId'.
+            // Simplest: Client emits 'join-room' again.
+            socketRef.current?.emit('join-room', { roomId });
+        });
+
+        socketRef.current.on('access-denied', () => {
+            setWaitingStatus('denied');
+            socketRef.current?.disconnect();
+        });
+
+        socketRef.current.on('wb-permissions-update', ({ canWrite }: { canWrite: boolean }) => {
+            console.log("WB Permission:", canWrite);
+            setCanWriteWb(canWrite);
+        });
+
+        socketRef.current.on('force-mute', () => {
+            // Mute myself
+            if (myStreamRef.current) {
+                const track = myStreamRef.current.getAudioTracks()[0];
+                if (track && track.enabled) {
+                    track.enabled = false;
+                    setIsMuted(true);
+                    // Notify server I am muted (ACK)
+                    socketRef.current?.emit('toggle-mute', { roomId, isMuted: true });
+                }
+            }
+        });
+
+        socketRef.current.on('kicked', () => {
+            alert("You have been kicked from the meeting.");
+            window.location.href = '/';
+        });
+
+        socketRef.current.on('waiting-list-update', (list: any[]) => {
+            setWaitingList(list);
         });
 
         socketRef.current.on('user-toggled-mute', ({ socketId, isMuted }: { socketId: string, isMuted: boolean }) => {
@@ -375,7 +438,29 @@ export const useWebRTC = (roomId: string) => {
 
     const clearPollResults = () => setPollResults(null);
 
-    return { peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current, sendReaction, lastReaction, pollState, pollResults, createPoll, submitVote, clearPollResults };
+    // Host Actions
+    const approveUser = (email: string) => {
+        socketRef.current?.emit('host-action', { action: 'approve-user', roomId, targetEmail: email });
+    };
+    const denyUser = (email: string) => {
+        socketRef.current?.emit('host-action', { action: 'deny-user', roomId, targetEmail: email });
+    };
+    const kickUser = (email: string, socketId?: string) => {
+        socketRef.current?.emit('host-action', { action: 'kick-user', roomId, targetEmail: email, targetId: socketId });
+    };
+    const toggleWbAccess = (email: string) => {
+        socketRef.current?.emit('host-action', { action: 'toggle-wb-access', roomId, targetEmail: email });
+    };
+    const remoteMute = (socketId: string) => {
+        socketRef.current?.emit('host-action', { action: 'mute-user', roomId, targetId: socketId });
+    };
+
+    return {
+        peers, participants, myStream, toggleMute, isMuted, endMeeting, socket: socketRef.current, sendReaction, lastReaction,
+        pollState, pollResults, createPoll, submitVote, clearPollResults,
+        waitingStatus, waitingList, canWriteWb,
+        hostActions: { approveUser, denyUser, kickUser, toggleWbAccess, remoteMute }
+    };
 };
 
 const preferCodec = (sdp: string, codec: string) => {

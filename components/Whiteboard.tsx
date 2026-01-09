@@ -10,6 +10,7 @@ interface WhiteboardProps {
     user: any;
     onClose: () => void;
     isHost?: boolean;
+    canWrite: boolean;
 }
 
 interface Point {
@@ -25,15 +26,15 @@ interface Stroke {
     userId?: string;
 }
 
-export default function Whiteboard({ roomId, socket, user, onClose, isHost }: WhiteboardProps) {
+export default function Whiteboard({ roomId, socket, user, onClose, isHost, canWrite }: WhiteboardProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [color, setColor] = useState('#000000');
-    const [isErasing, setIsErasing] = useState(false); 
+    const [isErasing, setIsErasing] = useState(false);
     const [width, setWidth] = useState(2);
     const [isSaving, setIsSaving] = useState(false);
 
     const strokesRef = useRef<Stroke[]>([]);
-    const [renderTrigger, setRenderTrigger] = useState(0); 
+    const [renderTrigger, setRenderTrigger] = useState(0);
 
     const isDrawing = useRef(false);
     const currentStroke = useRef<Stroke | null>(null);
@@ -64,7 +65,7 @@ export default function Whiteboard({ roomId, socket, user, onClose, isHost }: Wh
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-         
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         strokesRef.current.forEach(stroke => {
@@ -108,11 +109,12 @@ export default function Whiteboard({ roomId, socket, user, onClose, isHost }: Wh
 
 
     const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+        if (!canWrite && !isHost) return;
         e.preventDefault();
         const pos = getNormalizedPos(e);
 
         if (isErasing) {
-            isDrawing.current = true; 
+            isDrawing.current = true;
             checkEraserHit(pos);
             return;
         }
@@ -152,7 +154,7 @@ export default function Whiteboard({ roomId, socket, user, onClose, isHost }: Wh
 
         const stroke = currentStroke.current;
         if (stroke) {
-           
+
             strokesRef.current.push(stroke);
             currentStroke.current = null;
 
@@ -166,7 +168,7 @@ export default function Whiteboard({ roomId, socket, user, onClose, isHost }: Wh
     };
 
     const checkEraserHit = (pos: Point) => {
-        const threshold = 0.02; 
+        const threshold = 0.02;
         const strokes = strokesRef.current;
         const idsToDelete: string[] = [];
 
@@ -176,7 +178,7 @@ export default function Whiteboard({ roomId, socket, user, onClose, isHost }: Wh
                 const dist = Math.sqrt(Math.pow(p.x - pos.x, 2) + Math.pow(p.y - pos.y, 2));
                 if (dist < threshold) {
                     idsToDelete.push(stroke.id);
-                    break; 
+                    break;
                 }
             }
         }
@@ -347,6 +349,9 @@ export default function Whiteboard({ roomId, socket, user, onClose, isHost }: Wh
                     )}
                 </div>
                 <div className="flex gap-2">
+                    {!canWrite && !isHost && (
+                        <span className="text-gray-500 text-sm font-medium self-center mr-2">(View Only)</span>
+                    )}
                     {isHost && (
                         <button
                             onClick={saveAndClear}
