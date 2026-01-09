@@ -80,7 +80,7 @@ export default function RoomPage({ params }: { params: Promise<{ code: string }>
             {/* Header */}
             <header className="flex justify-between items-center px-4 md:px-6 py-3 md:py-4 border-b border-white/5 bg-gray-950/50 backdrop-blur-md z-10 shrink-0">
                 <div className="flex items-center gap-4">
-                    <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">LiteClass</h1>
+                    <img src="/logo.png" alt="LiteClass Logo" className="h-8 md:h-10 w-auto" />
                 </div>
                 <div className="flex items-center gap-3 bg-white/5 px-3 py-1 md:py-1.5 rounded-full border border-white/5">
                     <span className="text-gray-400 text-[10px] md:text-xs uppercase tracking-wider font-semibold">Code</span>

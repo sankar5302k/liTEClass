@@ -74,7 +74,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 md:mb-12 gap-4">
-        <h1 className="text-3xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">LiteClass</h1>
+        <img src="/logo.png" alt="LiteClass Logo" className="h-10 md:h-12 w-auto" />
         <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-end">
           <div className="flex items-center gap-3">
             <img src={user?.picture} alt={user?.name} className="w-10 h-10 rounded-full border-2 border-primary object-cover" referrerPolicy="no-referrer" />

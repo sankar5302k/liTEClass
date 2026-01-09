@@ -43,9 +43,9 @@ export default function LoginPage() {
             <div className="w-full max-w-md p-8 z-10 mx-4">
                 <div className="bg-gray-800/50 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl p-8 space-y-8">
                     <div className="text-center space-y-2">
-                        <h1 className="text-4xl font-extrabold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-                            LiteClass
-                        </h1>
+                        <div className="flex justify-center mb-4">
+                            <img src="/logo.png" alt="LiteClass Logo" className="h-16 w-auto" />
+                        </div>
                         <p className="text-gray-400 text-sm">
                             The future of seamless virtual learning
                         </p>
